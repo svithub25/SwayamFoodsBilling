@@ -72,7 +72,7 @@ const Contactus = () => {
                     <div className="space-y-1 text-gray-600">
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Main:</span>
-                        <span className="font-medium">(555) 123-4567</span>
+                        <span className="font-medium">9373893048</span>
                       </p>
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Fax:</span>
@@ -98,7 +98,7 @@ const Contactus = () => {
                     <div className="space-y-1 text-gray-600">
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">General:</span>
-                        <span className="font-medium">info@sterling.com</span>
+                        <span className="font-medium">svithub25@gmail.com</span>
                       </p>
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Billing:</span>

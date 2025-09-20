@@ -1,7 +1,7 @@
 {
-  "name": "Stationery-Pro",
-  "private": true,
-  "version": "1.0.0",
+  "name": "Billing-Software",
+  "private": true, 
+  "version": "1.1.0",
   "type": "module",
   "main": "electron/main.js",
   "homepage": "./",
@@ -53,8 +53,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.stationery.management",
-    "productName": "Stationery Pro",
+    "appId": "com.billing.software",
+    "productName": "Billing Software",
     "icon": "electron/favicon.ico",
     "directories": {
       "output": "dist-electron"
