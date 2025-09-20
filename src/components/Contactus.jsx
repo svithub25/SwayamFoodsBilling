@@ -104,10 +104,7 @@ const Contactus = () => {
                         <span className="text-sm text-gray-500 w-16">Billing:</span>
                         <span className="font-medium">testingclient123@sterling.com</span>
                       </p>
-                      <p className="flex items-center">
-                        <span className="text-sm text-gray-500 w-16">Support:</span>
-                        <span className="font-medium">support@sterling.com</span>
-                      </p>
+                      
                     </div>
                   </div>
                 </div>
