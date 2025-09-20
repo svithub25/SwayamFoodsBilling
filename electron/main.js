@@ -76,6 +76,8 @@ function initDatabase() {
     mrp REAL DEFAULT 0,
     purchase_rate REAL DEFAULT 0,
     sale_rate REAL DEFAULT 0,
+    customer_rate REAL DEFAULT 0,
+    salesman_rate REAL DEFAULT 0,
     gst_percentage REAL DEFAULT 0,
     category_id INTEGER DEFAULT NULL,
     current_stock INTEGER DEFAULT 0,
@@ -506,14 +508,18 @@ ipcMain.handle('check-gst-exists', async (event, rate, excludeId = null) => {
 // Modify add-item to check SKU before insert
 ipcMain.handle('add-item', async (event, itemData) => {
   try {
-    // Check for duplicate SKU
     const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)').get(itemData.sku);
-    if (exists) {
-      // Throw error to be caught in renderer
-      throw new Error('SKU already exists');
-    }
-    const stmt = db.prepare('INSERT INTO items (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, gst_percentage, category_id, current_stock, minimum_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-    const result = stmt.run(itemData.name, itemData.sku, itemData.hsn_code, itemData.description, itemData.unit, itemData.mrp, itemData.purchase_rate, itemData.sale_rate, itemData.gst_percentage, itemData.category_id, itemData.current_stock, itemData.minimum_stock);
+    if (exists) throw new Error('SKU already exists');
+    const stmt = db.prepare(
+      `INSERT INTO items 
+        (name, sku, hsn_code, description, unit, mrp, purchase_rate, sale_rate, customer_rate, salesman_rate, gst_percentage, category_id, current_stock, minimum_stock) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const result = stmt.run(
+      itemData.name, itemData.sku, itemData.hsn_code, itemData.description, itemData.unit,
+      itemData.mrp, itemData.purchase_rate, itemData.sale_rate, itemData.customer_rate, itemData.salesman_rate,
+      itemData.gst_percentage, itemData.category_id, itemData.current_stock, itemData.minimum_stock
+    );
     return { id: result.lastInsertRowid, ...itemData };
   } catch (error) {
     console.error(error);
@@ -525,11 +531,17 @@ ipcMain.handle('add-item', async (event, itemData) => {
 ipcMain.handle('update-item', async (event, { id, sku, ...rest }) => {
   try {
     const exists = db.prepare('SELECT id FROM items WHERE sku = ? AND id != ? AND (status_code = 0 OR status_code IS NULL)').get(sku, id);
-    if (exists) {
-      throw new Error('SKU already exists');
-    }
-    const stmt = db.prepare('UPDATE items SET name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ? WHERE id = ?');
-    const result = stmt.run(rest.name, sku, rest.hsn_code, rest.description, rest.unit, rest.mrp, rest.purchase_rate, rest.sale_rate, rest.gst_percentage, rest.category_id, rest.current_stock, rest.minimum_stock, id);
+    if (exists) throw new Error('SKU already exists');
+    const stmt = db.prepare(
+      `UPDATE items SET 
+        name = ?, sku = ?, hsn_code = ?, description = ?, unit = ?, mrp = ?, purchase_rate = ?, sale_rate = ?, customer_rate = ?, salesman_rate = ?, gst_percentage = ?, category_id = ?, current_stock = ?, minimum_stock = ? 
+      WHERE id = ?`
+    );
+    const result = stmt.run(
+      rest.name, sku, rest.hsn_code, rest.description, rest.unit,
+      rest.mrp, rest.purchase_rate, rest.sale_rate, rest.customer_rate, rest.salesman_rate,
+      rest.gst_percentage, rest.category_id, rest.current_stock, rest.minimum_stock, id
+    );
     return result.changes > 0;
   } catch (error) {
     console.error(error);

@@ -20,6 +20,7 @@ const Billing = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
   const [selectedSalesman, setSelectedSalesman] = useState('');
+  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
   const discountInputRef = useRef();
   const qtyInputRefs = useRef({});
   const searchInputRef = useRef();
@@ -88,11 +89,12 @@ const Billing = () => {
 
   // --- Add to cart with empty quantity ---
   const addToCart = (item) => {
+    const rate = isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
     const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
     if (existingIndex !== -1) {
       setCart(cart.map((cartItem, idx) =>
         cartItem.id === item.id
-          ? { ...cartItem, quantity: '' }
+          ? { ...cartItem, quantity: '', unit_price: rate }
           : cartItem
       ));
       setTimeout(() => {
@@ -107,7 +109,7 @@ const Billing = () => {
             name: item.name,
             sku: item.sku,
             hsn_code: item.hsn_code,
-            unit_price: item.sale_rate,
+            unit_price: rate,
             quantity: '', // <-- empty
             current_stock: item.current_stock,
             gst_percentage: item.gst_percentage,
@@ -313,6 +315,18 @@ const getFinalTotal = () => {
     }
   };
 
+  useEffect(() => {
+    setCart(cart =>
+      cart.map(cartItem => {
+        const item = items.find(i => i.id === cartItem.id);
+        if (!item) return cartItem;
+        const rate = isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
+        return { ...cartItem, unit_price: rate };
+      })
+    );
+    // eslint-disable-next-line
+  }, [isSalesmanCustomer]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -394,6 +408,18 @@ const getFinalTotal = () => {
                 />
               </div>
             </div>
+            <div className="flex items-center mt-2">
+      <input
+        type="checkbox"
+        checked={isSalesmanCustomer}
+        onChange={e => setIsSalesmanCustomer(e.target.checked)}
+        id="isSalesmanCustomer"
+        className="mr-2"
+      />
+      <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
+        Is Salesman
+      </label>
+    </div>
           </div>
 
           {/* Salesman Selection */}

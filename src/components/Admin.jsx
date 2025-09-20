@@ -50,6 +50,8 @@ const Admin = () => {
     mrp: '',
     purchase_rate: '',
     sale_rate: '',
+    customer_rate: '',
+    salesman_rate: '',
     gst_percentage: '',
     category_id: '',
     current_stock: '',
@@ -94,9 +96,9 @@ const Admin = () => {
   const validateUnitForm = (form) => {
     const errors = {};
     if (!form.name || String(form.name).trim().length < 1) errors.name = 'Unit name is required';
-    return errors;
+    return errors; 
   };
-
+ 
   const validateGstForm = (form) => {
     const errors = {};
     if (form.rate === '' || form.rate === null || isNaN(form.rate)) errors.rate = 'GST rate is required';
@@ -120,6 +122,12 @@ const Admin = () => {
 
     const sr = parseFloat(form.sale_rate);
     if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
+
+    const cr = parseFloat(form.customer_rate);
+    if (isNaN(cr) || cr < 0) errors.customer_rate = 'Customer rate must be 0 or more';
+
+    const smr = parseFloat(form.salesman_rate);
+    if (isNaN(smr) || smr < 0) errors.salesman_rate = 'Salesman rate must be 0 or more';
 
     if (isEmpty(form.gst_percentage) && form.gst_percentage !== 0) {
       errors.gst_percentage = 'GST rate is required';
@@ -145,6 +153,8 @@ const Admin = () => {
     mrp: Math.max(0, parseFloat(form.mrp) || 0),
     purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
     sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
+    customer_rate: Math.max(0, parseFloat(form.customer_rate) || 0),
+    salesman_rate: Math.max(0, parseFloat(form.salesman_rate) || 0),
     gst_percentage: parseFloat(form.gst_percentage) || 0,
     category_id: parseInt(form.category_id, 10),
     current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
@@ -674,6 +684,8 @@ const Admin = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Rate</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Rate</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman Rate</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST%</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -693,6 +705,12 @@ const Admin = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           ₹{product.sale_rate}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₹{product.customer_rate}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ₹{product.salesman_rate}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                           {product.gst_percentage}%
@@ -1126,6 +1144,46 @@ const Admin = () => {
                   min={0}
                 />
                 {productErrors.sale_rate && <p className="text-red-600 text-xs mt-1">{productErrors.sale_rate}</p>}
+              </div>
+
+              {/* Customer Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Customer Rate</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  onWheel={e => e.target.blur()}
+                  value={productForm.customer_rate}
+                  onChange={(e) => {
+                    setProductForm({ ...productForm, customer_rate: e.target.value });
+                    if (productErrors.customer_rate) setProductErrors({ ...productErrors, customer_rate: undefined });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    productErrors.customer_rate ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min={0}
+                />
+                {productErrors.customer_rate && <p className="text-red-600 text-xs mt-1">{productErrors.customer_rate}</p>}
+              </div>
+
+              {/* Salesman Rate */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Salesman Rate</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  onWheel={e => e.target.blur()}
+                  value={productForm.salesman_rate}
+                  onChange={(e) => {
+                    setProductForm({ ...productForm, salesman_rate: e.target.value });
+                    if (productErrors.salesman_rate) setProductErrors({ ...productErrors, salesman_rate: undefined });
+                  }}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    productErrors.salesman_rate ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  min={0}
+                />
+                {productErrors.salesman_rate && <p className="text-red-600 text-xs mt-1">{productErrors.salesman_rate}</p>}
               </div>
 
               {/* GST % (required) */}

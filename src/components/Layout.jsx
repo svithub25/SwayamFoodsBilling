@@ -48,7 +48,7 @@ const Layout = ({ children, user, onLogout }) => {
           <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
           <nav className="fixed top-0 left-0 bottom-0 flex flex-col w-64 bg-white shadow-xl">
             <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200"> 
-              <h1 className="text-xl font-bold text-gray-900">Swyama foods</h1>
+              <h1 className="text-xl font-bold text-gray-900">Swayam Foods</h1>
               {/* <h1 className="text-xl font-bold text-gray-900">Shiva Books & Stationery</h1> */}
               <button tabIndex={-1} onClick={() => setSidebarOpen(false)} className="p-2 rounded-md hover:bg-gray-100">
                 <X className="w-5 h-5" /> 
@@ -82,7 +82,7 @@ const Layout = ({ children, user, onLogout }) => {
       {/* Desktop sidebar */}
       <nav className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-white shadow-lg border-r border-gray-200">
         <div className="flex items-center h-16 px-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">Swyama foods</h1>
+          <h1 className="text-xl font-bold bg-red-500 text-gray-900">Swayam Foods</h1>
            {/* <h1 className="text-xl font-bold text-gray-900">Shiva Books & Stationery</h1> */}
         </div>
         <div className="flex flex-col flex-1 pt-4">
