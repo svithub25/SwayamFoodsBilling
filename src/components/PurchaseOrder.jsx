@@ -15,67 +15,9 @@ import jsPDF from 'jspdf';
 import Invoice from './Invoice'; // Make sure the path is correct
 import { useHotkeys } from "react-hotkeys-hook";
 
+import PinProtected from './reusables/PinProtected';
 // --- PIN Modal (reuse from Purchase.jsx or define here) ---
-const PinModal = ({ isOpen, onClose, onVerify }) => {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const isValid = await window.electronAPI.verifyPin(pin);
-    if (isValid) {
-      onVerify();
-      onClose();
-      setPin('');
-      setError('');
-    } else {
-      setError('Invalid PIN');
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <div className="flex items-center mb-4">
-          <Lock className="w-6 h-6 text-red-600 mr-2" />
-          <h2 className="text-xl font-bold text-gray-900">Enter PIN</h2>
-        </div>
-        <p className="text-gray-600 mb-4">This module is protected. Please enter your PIN to continue.</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="password"
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            autoFocus
-            placeholder="Enter 4-digit PIN"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-4"
-            maxLength="4"
-          />
-          {error && (
-            <p className="text-red-600 text-sm mb-4">{error}</p>
-          )}
-          <div className="flex space-x-3">
-            <button
-              type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              Verify
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
 
 const PurchaseOrder = () => {
   const navigate = useNavigate();
@@ -92,17 +34,17 @@ const PurchaseOrder = () => {
   const invoiceRef = useRef();
 
   // --- Module protection state ---
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
+
+
 
   // Hotkeys for fast navigation
   useHotkeys('ctrl+k', (e) => { e.preventDefault(); searchInputRef.current?.focus(); }, { enableOnTags: ['INPUT'] });
 
   useEffect(() => {
-    if (isUnlocked) {
-      loadData();
-    }
-  }, [isUnlocked]);
+
+    loadData();
+
+  }, []);
 
   const loadData = async () => {
     try {
@@ -120,8 +62,6 @@ const PurchaseOrder = () => {
   };
 
   // --- Module protection handlers ---
-  const handleUnlock = () => setShowPinModal(true);
-  const handlePinVerified = () => setIsUnlocked(true);
 
   // Filtered items for dropdown
   const filteredItems = items.filter(item =>
@@ -204,10 +144,10 @@ const PurchaseOrder = () => {
     const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF({
       orientation: "portrait",
-      unit: "mm", 
+      unit: "mm",
       format: "a4",
     });
-    console.log(orderItems)  
+    console.log(orderItems)
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const imgProps = pdf.getImageProperties(imgData);
@@ -219,31 +159,6 @@ const PurchaseOrder = () => {
   };
 
   // --- Module protection UI ---
-  if (!isUnlocked) {
-    return (
-      <>
-        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-lg shadow-sm border border-gray-200">
-          <Lock className="w-16 h-16 text-gray-400 mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Purchase Order Module Locked</h2>
-          <p className="text-gray-600 text-center mb-6">
-            This module is protected and requires PIN verification to access.
-          </p>
-          <button
-            onClick={handleUnlock}
-            className="flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            <Lock className="w-4 h-4 mr-2" />
-            Unlock Module
-          </button>
-        </div>
-        <PinModal
-          isOpen={showPinModal}
-          onClose={() => setShowPinModal(false)}
-          onVerify={handlePinVerified}
-        />
-      </>
-    );
-  }
 
   if (loading) {
     return (
@@ -282,182 +197,202 @@ const PurchaseOrder = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hidden Invoice for PDF generation */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        <div ref={invoiceRef}>
-          <Invoice
-            billNumber={`PO-${Date.now()}`}
-            customer={invoiceCustomer}
-            items={invoiceItems}
-            discount={0}
-            subtotal={getOrderTotal()}
-            total={getOrderTotal()}
-          />
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate('/purchase')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create Purchase Order</h1>
-            <p className="text-gray-600">Select items and generate a purchase order for suppliers</p>
+    <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase Order'> 
+      <div className="space-y-6">
+        {/* Hidden Invoice for PDF generation */}
+        <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          <div ref={invoiceRef}>
+            <Invoice
+              billNumber={`PO-${Date.now()}`}
+              customer={invoiceCustomer}
+              items={invoiceItems}
+              discount={0}
+              subtotal={getOrderTotal()}
+              total={getOrderTotal()}
+            />
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Items Selection */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Supplier Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Supplier</label>
-            <select
-              value={selectedSupplier}
-              onChange={(e) => setSelectedSupplier(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/purchase')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <option value="">Choose a supplier</option>
-              {suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Search */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="relative">
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search items by name or SKU... (Ctrl+K to focus, Enter/Tab to add)"
-                value={searchTerm}
-                onChange={e => {
-                  setSearchTerm(e.target.value);
-                  setSearchDropdown(true);
-                  setSearchIndex(0);
-                }}
-                onFocus={() => setSearchDropdown(true)}
-                onBlur={() => setTimeout(() => setSearchDropdown(false), 100)}
-                onKeyDown={handleSearchKeyDown}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                tabIndex={0}
-                autoComplete="off"
-              />
-              {searchDropdown && filteredItems.length > 0 && (
-                <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
-                  {filteredItems.map((item, idx) => (
-                    <li
-                      key={item.id}
-                      className={`px-3 py-2 cursor-pointer ${idx === searchIndex ? 'bg-blue-100' : ''}`}
-                      onMouseDown={() => {
-                        addToOrder(item);
-                        setSearchTerm('');
-                        setSearchDropdown(false);
-                        setSearchIndex(0);
-                      }}
-                      tabIndex={-1}
-                    >
-                      {item.name} <span className="text-xs text-gray-400">({item.current_stock} {item.unit})</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          {/* Items Grid */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Items</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {filteredItems.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-gray-900">{item.name}</h3>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
-                  <p className="text-sm text-gray-600 mb-2">Current Stock: {item.current_stock}</p>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-gray-900">₹{item.purchase_rate}</span>
-                    <span className="text-sm text-gray-600">GST: {item.gst_percentage}%</span>
-                  </div>
-                  <button
-                    onClick={() => addToOrder(item)}
-                    className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add to Order
-                  </button>
-                </div>
-              ))}
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Create Purchase Order</h1>
+              <p className="text-gray-600">Select items and generate a purchase order for suppliers</p>
             </div>
           </div>
         </div>
 
-        {/* Order Summary */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Purchase Order</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Items Selection */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Supplier Selection */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Supplier</label>
+              <select
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Choose a supplier</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                ))}
+              </select>
+            </div>
 
-            {orderItems.length === 0 ? (
-              <div className="text-center py-8">
-                <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No items selected</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {orderItems.map((item, idx) => (
-                  <div key={item.id} className="border-b border-gray-200 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">{item.name}</h4>
-                      <button
-                        onClick={() => removeFromOrder(item.id)}
-                        className="text-red-600 hover:text-red-800"
+            {/* Search */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search items by name or SKU... (Ctrl+K to focus, Enter/Tab to add)"
+                  value={searchTerm}
+                  onChange={e => {
+                    setSearchTerm(e.target.value);
+                    setSearchDropdown(true);
+                    setSearchIndex(0);
+                  }}
+                  onFocus={() => setSearchDropdown(true)}
+                  onBlur={() => setTimeout(() => setSearchDropdown(false), 100)}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  tabIndex={0}
+                  autoComplete="off"
+                />
+                {searchDropdown && filteredItems.length > 0 && (
+                  <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                    {filteredItems.map((item, idx) => (
+                      <li
+                        key={item.id}
+                        className={`px-3 py-2 cursor-pointer ${idx === searchIndex ? 'bg-blue-100' : ''}`}
+                        onMouseDown={() => {
+                          addToOrder(item);
+                          setSearchTerm('');
+                          setSearchDropdown(false);
+                          setSearchIndex(0);
+                        }}
+                        tabIndex={-1}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">SKU: {item.sku}</p>
+                        {item.name} <span className="text-xs text-gray-400">({item.current_stock} {item.unit})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Items Grid */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Items</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {filteredItems.map((item) => (
+                  <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          ref={el => qtyInputRefs.current[item.id] = el}
-                          type="number"
-                          onWheel={e => e.target.blur()}
-                          value={item.requested_quantity}
-                          min={1}
-                          onChange={e => {
-                            const val = e.target.value;
-                            // Allow empty string for fast typing
-                            if (val === '') {
-                              updateOrderItemQuantity(item.id, '');
-                            } else if (isNaN(Number(val)) || Number(val) <= 0) {
-                              removeFromOrder(item.id);
-                            } else {
-                              updateOrderItemQuantity(item.id, val);
-                            }
-                          }}
-                          onKeyDown={e => handleQtyKeyDown(e, idx, item.id)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                          tabIndex={0}
-                          autoFocus={item.requested_quantity === ''}
-                        />
-                        <span className="text-gray-500">/ {item.current_stock} {item.unit}</span>
-                      </div>
-                      <span className="font-medium">₹{calculateItemTotal(item).toFixed(2)}</span>
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Rate: ₹{item.purchase_rate} + GST ({item.gst_percentage}%)
+                    <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
+                    <p className="text-sm text-gray-600 mb-2">Current Stock: {item.current_stock}</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-lg font-bold text-gray-900">₹{item.purchase_rate}</span>
+                      <span className="text-sm text-gray-600">GST: {item.gst_percentage}%</span>
+                    </div>
+                    <button
+                      onClick={() => addToOrder(item)}
+                      className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add to Order
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Order Summary */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Purchase Order</h2>
+
+              {orderItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No items selected</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orderItems.map((item, idx) => (
+                    <div key={item.id} className="border-b border-gray-200 pb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium text-gray-900">{item.name}</h4>
+                        <button
+                          onClick={() => removeFromOrder(item.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-2">SKU: {item.sku}</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            ref={el => qtyInputRefs.current[item.id] = el}
+                            type="number"
+                            onWheel={e => e.target.blur()}
+                            value={item.requested_quantity}
+                            min={1}
+                            onChange={e => {
+                              const val = e.target.value;
+                              // Allow empty string for fast typing
+                              if (val === '') {
+                                updateOrderItemQuantity(item.id, '');
+                              } else if (isNaN(Number(val)) || Number(val) <= 0) {
+                                removeFromOrder(item.id);
+                              } else {
+                                updateOrderItemQuantity(item.id, val);
+                              }
+                            }}
+                            onKeyDown={e => handleQtyKeyDown(e, idx, item.id)}
+                            className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            tabIndex={0}
+                            autoFocus={item.requested_quantity === ''}
+                          />
+                          <span className="text-gray-500">/ {item.current_stock} {item.unit}</span>
+                        </div>
+                        <span className="font-medium">₹{calculateItemTotal(item).toFixed(2)}</span>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Rate: ₹{item.purchase_rate} + GST ({item.gst_percentage}%)
+                      </div>
+                    </div>
+                  ))}
+                  {/* Total */}
+                  <div className="pt-4 space-y-2">
+                    <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">
+                      <span>Total Amount:</span>
+                      <span>₹{getOrderTotal().toFixed(2)}</span>
                     </div>
                   </div>
-                ))}                                {/* Total */}                <div className="pt-4 space-y-2">                  <div className="flex justify-between text-lg font-bold border-t border-gray-200 pt-2">                    <span>Total Amount:</span>                    <span>₹{getOrderTotal().toFixed(2)}</span>                  </div>                </div>                                {/* Generate Order Button */}                <button onClick={handleDownloadPDF} disabled={!selectedSupplier} className="w-full flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors mt-4"                >                  <FileText className="w-4 h-4 mr-2" />                  Generate Purchase Order PDF                </button>                                {!selectedSupplier && (<p className="text-sm text-red-600 text-center">Please select a supplier to generate the order</p>)}              </div>)}          </div>        </div>      </div>    </div>);
+                  {/* Generate Order Button */}
+                  <button onClick={handleDownloadPDF} disabled={!selectedSupplier} className="w-full flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors mt-4">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Purchase Order PDF
+                  </button>
+                  {!selectedSupplier && (<p className="text-sm text-red-600 text-center">Please select a supplier to generate the order</p>)}
+                </div>)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </PinProtected>);
 };
 
 export default PurchaseOrder;
