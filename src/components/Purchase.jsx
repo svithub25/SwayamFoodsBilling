@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShoppingCart, 
   Plus, 
@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Eye,
   History,
-  Edit3
+  Edit3,
+  FileText
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -18,6 +19,9 @@ import { useNavigate } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 
 import PinProtected from './reusables/PinProtected';
+import PurchasePDF from './PurchasePDF';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const DropdownPortal = ({ children, anchorRef, show }) => {
   const [style, setStyle] = useState({});
@@ -49,6 +53,11 @@ const Purchase = () => {
   const [loading, setLoading] = useState(false);
   const [showNewSupplierForm, setShowNewSupplierForm] = useState(false);
   
+
+const [categories, setCategories] = useState([]);
+const [units, setUnits] = useState([]);
+const [gstRates, setGstRates] = useState([]);
+  
   const [purchaseForm, setPurchaseForm] = useState({
     supplier_id: '',
     invoice_number: '',
@@ -57,7 +66,16 @@ const Purchase = () => {
     items: []
   });
 
-
+  const loadMetaData = async () => {
+    const [categoriesData, unitsData, gstRatesData] = await Promise.all([
+      window.electronAPI.getCategories(),
+      window.electronAPI.getUnits(),
+      window.electronAPI.getGstRates()
+    ]);
+    setCategories(categoriesData);
+    setUnits(unitsData);
+    setGstRates(gstRatesData);
+  };
   // Add these payment handler functions after your state declarations
 const handlePurchasePaidChange = async (purchaseId, isPaid) => {
   if (isPaid) {
@@ -161,9 +179,89 @@ const handlePurchasePaymentSubmit = async () => {
     paymentDetails: {}
   });
 
+  // New states and functions for product form
+  const [showProductForm, setShowProductForm] = useState(false);
+  const initialProductForm = {
+    name: '',
+    sku: '',
+    hsn_code: '',
+    description: '',
+    unit: '',
+    mrp: '',
+    purchase_rate: '',
+    sale_rate: '',
+    gst_percentage: '',
+    category_id: '',
+    current_stock: '',
+    minimum_stock: 10
+  };
+  const [productForm, setProductForm] = useState(initialProductForm);
+  const [productErrors, setProductErrors] = useState({});
+
+  const validateProductForm = (form) => {
+    const errors = {};
+    const isEmpty = (v) => v === '' || v === null || v === undefined;
+    if (isEmpty(form.name) || String(form.name).trim().length < 2) errors.name = 'Name is required';
+    if (isEmpty(form.sku) || String(form.sku).trim().length < 1) errors.sku = 'SKU is required';
+    if (isEmpty(form.unit)) errors.unit = 'Unit is required';
+    if (isEmpty(form.category_id)) errors.category_id = 'Category is required';
+    const mrp = parseFloat(form.mrp);
+    if (isNaN(mrp) || mrp <= 0) errors.mrp = 'MRP must be greater than 0';
+    const pr = parseFloat(form.purchase_rate);
+    if (isNaN(pr) || pr <= 0) errors.purchase_rate = 'Purchase rate must be greater than 0';
+    const sr = parseFloat(form.sale_rate);
+    if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
+    if (isEmpty(form.gst_percentage) && form.gst_percentage !== 0) errors.gst_percentage = 'GST rate is required';
+    return errors;
+  };
+
+  const buildProductPayload = (form) => ({
+    name: String(form.name).trim(),
+    sku: String(form.sku).trim(),
+    hsn_code: String(form.hsn_code || '').trim(),
+    description: String(form.description || '').trim(),
+    unit: String(form.unit),
+    mrp: Math.max(0, parseFloat(form.mrp) || 0),
+    purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
+    sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
+    gst_percentage: parseFloat(form.gst_percentage) || 0,
+    category_id: parseInt(form.category_id, 10),
+    current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
+    minimum_stock: Math.max(0, parseInt(form.minimum_stock, 10) || 0)
+  });
+
+  const handleAddProduct = async () => {
+    const errors = validateProductForm(productForm);
+    if (Object.keys(errors).length) {
+      setProductErrors(errors);
+      toast.error('Please fill all required fields');
+      return;
+    }
+    try {
+      // Check SKU uniqueness
+      const skuExists = await window.electronAPI.checkSkuExists(productForm.sku);
+      if (skuExists) {
+        setProductErrors({ ...errors, sku: 'SKU already exists' });
+        toast.error('SKU already exists');
+        return;
+      }
+      const payload = buildProductPayload(productForm);
+      const newProduct = await window.electronAPI.addItem(payload);
+      toast.success('Product added successfully');
+      setItems([...items, newProduct]);
+      setShowProductForm(false);
+      setProductForm(initialProductForm);
+      setProductErrors({});
+    } catch (error) {
+      toast.error('Error adding product');
+      console.error('Error adding product:', error);
+    }
+  };
+
   useEffect(() => {
    
-      loadData();
+      loadData(); 
+      loadMetaData();
     
   }, []);
 
@@ -248,6 +346,22 @@ const handlePurchasePaymentSubmit = async () => {
 
   const savePurchase = async () => {
 
+
+     const supplierValid = suppliers.some(s => s.id === purchaseForm.supplier_id);
+  if (!supplierValid) {
+    toast.error('Please select a valid supplier from the dropdown.');
+    return;
+  }
+
+  // Validate items selection
+  const invalidItemIndex = purchaseForm.items.findIndex(item => {
+    // Must have a valid item id from dropdown
+    return !items.some(i => i.id == item.id);
+  });
+  if (invalidItemIndex !== -1) {
+    toast.error(`Please select a valid item for row ${invalidItemIndex + 1} from the dropdown.`);
+    return;
+  } 
 
     if (!purchaseForm.supplier_id || !purchaseForm.invoice_number || purchaseForm.items.length === 0) {
       toast.error('Please fill all required fields');
@@ -390,10 +504,11 @@ const handlePurchasePaymentSubmit = async () => {
   };
 
   // Filter items for a row
-  const getFilteredItems = (search) =>
-    items.filter(i =>
-      i.name.toLowerCase().includes((search || '').toLowerCase())
-    );
+const getFilteredItems = (search) =>
+  items.filter(i =>
+    i.name.toLowerCase().includes((search || '').toLowerCase()) ||
+    (i.sku && i.sku.toLowerCase().includes((search || '').toLowerCase()))
+  ); 
 
   // Keyboard navigation for item dropdown
   const handleItemInputKeyDown = (e, rowIdx) => {
@@ -527,7 +642,89 @@ const handlePurchasePaymentSubmit = async () => {
   };
   const getFinalTotal = () => Math.round(totalWithGst);
  
-  
+  const handleReprintPurchase = async (purchaseId) => {
+    try {
+      // Fetch purchase details from backend
+      const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchaseId);
+      console.log('purchaseDetails:', purchaseDetails);
+
+      // Defensive mapping for supplier from purchaseDetails.purchase
+      const supplier = {
+        name: purchaseDetails.purchase.supplier_name || "",
+        address: purchaseDetails.purchase.supplier_address || "",
+        gstin: purchaseDetails.purchase.supplier_gstin || "",
+        contact: purchaseDetails.purchase.supplier_contact || ""
+      };
+
+      // Defensive mapping for items from purchaseDetails.items
+      const items = (purchaseDetails.items || []).map(item => ({
+        hsn_code: item.hsn_code || "",
+        sku: item.sku || "",
+        name: item.item_name || "",
+        quantity: item.quantity || 0,
+        unit_price: item.unit_price || 0,
+        gst_percentage: item.gst_percentage || 0,
+        total_price: item.total_price || 0
+      }));
+
+      // Use purchaseDetails.purchase for all purchase fields
+      const purchaseNumber = purchaseDetails.purchase.id || purchaseDetails.purchase.invoice_number || "";
+      const invoiceNumber = purchaseDetails.purchase.invoice_number || "";
+      const purchaseDate = purchaseDetails.purchase.purchase_date
+        ? new Date(purchaseDetails.purchase.purchase_date).toLocaleDateString()
+        : "";
+
+      // Calculate subtotal if not provided
+      const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+
+      // Create a hidden container for rendering the PDF
+      const pdfContainer = document.createElement('div');
+      pdfContainer.style.position = 'fixed';
+      pdfContainer.style.left = '-9999px';
+      pdfContainer.style.top = '0';
+      pdfContainer.style.width = '800px';
+      pdfContainer.style.zIndex = '-1';
+      document.body.appendChild(pdfContainer);
+
+      // Render PurchasePDF
+      import('react-dom/client').then(({ createRoot }) => {
+        const root = createRoot(pdfContainer);
+        root.render(
+          <PurchasePDF
+            purchaseNumber={purchaseNumber}
+            invoiceNumber={invoiceNumber}
+            purchaseDate={purchaseDate}
+            supplier={supplier}
+            items={items}
+            discount={purchaseDetails.purchase.discount || 0}
+            subtotal={subtotal}
+            roundingOff={purchaseDetails.purchase.rounding_off || 0}
+            total={purchaseDetails.purchase.total_amount || subtotal}
+          />
+        );
+        setTimeout(async () => {
+          const canvas = await html2canvas(pdfContainer, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+          });
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const imgProps = pdf.getImageProperties(imgData);
+          const pdfWidth = pageWidth;
+          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+          pdf.save(`Purchase_${invoiceNumber || purchaseNumber || purchaseId}.pdf`);
+          root.unmount();
+          document.body.removeChild(pdfContainer);
+          toast.success('PDF generated!');
+        }, 300);
+      });
+    } catch (error) {
+      toast.error('Error generating PDF');
+    }
+  };
 
   if (loading) {
     return (
@@ -554,7 +751,17 @@ const handlePurchasePaymentSubmit = async () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* Supplier Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
+          <div className="flex items-center mb-2">
+    <label className="block text-sm font-medium text-gray-700">Supplier</label>
+    <button
+      onClick={() => setShowNewSupplierForm(true)}
+      className="ml-2 px-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+      tabIndex={0}
+    >
+      <Plus className="w-4 h-4" />
+    </button>
+  </div>
+            
             <div className="relative">
               <input
                 ref={supplierInputRef}
@@ -593,17 +800,11 @@ const handlePurchasePaymentSubmit = async () => {
                 </ul>
               )}
             </div>
-            <button
-              onClick={() => setShowNewSupplierForm(true)}
-              className="mt-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-              tabIndex={0}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+          
           </div>
           {/* Invoice Number */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Invoice Number</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Invoice Number</label>
             <input
               id="invoice-input"
               type="text"
@@ -616,7 +817,7 @@ const handlePurchasePaymentSubmit = async () => {
           </div>
           {/* Purchase Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Date</label>
+            <label className="block text-base font-medium text-gray-700 mb-2">Purchase Date</label>
             <input
               type="date"
               value={purchaseForm.purchase_date}
@@ -630,7 +831,18 @@ const handlePurchasePaymentSubmit = async () => {
         {/* Items Table */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-md font-medium text-gray-900">Items</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-md font-medium text-gray-900">Items</h3>
+              <button
+                onClick={() => setShowProductForm(true)}
+                className="px-1 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                title="Add New Item"
+                type="button"
+                tabIndex={0}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={addItemToPurchase}
               className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -674,7 +886,7 @@ const handlePurchasePaymentSubmit = async () => {
                     const filtered = getFilteredItems(itemSearch[index]);
                     return (
                       <tr key={index}>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3"> 
                           <div className="relative">
                             <input
                               ref={el => (itemInputRefs.current[index] = el)}
@@ -848,6 +1060,7 @@ const handlePurchasePaymentSubmit = async () => {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>
+                        
                       </tr>
                     );
                   })}
@@ -1027,6 +1240,13 @@ const handlePurchasePaymentSubmit = async () => {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                   <button
+                    onClick={() => handleReprintPurchase(purchase.id)}
+                    className="text-purple-600 hover:text-purple-900"
+                    title="Reprint Purchase"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </button> 
                   </td>
                 </tr>
               ))}
@@ -1515,6 +1735,186 @@ const handlePurchasePaymentSubmit = async () => {
         </div>
       )}
 
+
+{/* Items form */}
+{showProductForm && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <h2 className="text-xl font-bold mb-4">Add New Product</h2>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* Name */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+          <input
+            type="text"
+            value={productForm.name}
+            onChange={e => setProductForm({ ...productForm, name: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.name ? 'border-red-500' : 'border-gray-300'}`}
+          />
+          {productErrors.name && <p className="text-red-600 text-xs mt-1">{productErrors.name}</p>}
+        </div>
+        {/* SKU */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
+          <input
+            type="text"
+            value={productForm.sku}
+            onChange={e => setProductForm({ ...productForm, sku: e.target.value.toUpperCase() })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.sku ? 'border-red-500' : 'border-gray-300'}`}
+          />
+          {productErrors.sku && <p className="text-red-600 text-xs mt-1">{productErrors.sku}</p>}
+        </div>
+        {/* HSN */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">HSN Code</label>
+          <input
+            type="text"
+            value={productForm.hsn_code}
+            onChange={e => setProductForm({ ...productForm, hsn_code: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 48025610"
+          />
+        </div>
+        {/* Unit */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Unit</label>
+          <select
+            value={productForm.unit}
+            onChange={e => setProductForm({ ...productForm, unit: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.unit ? 'border-red-500' : 'border-gray-300'}`}
+          >
+            <option value="">Select Unit</option>
+            {units.map(unit => (
+              <option key={unit.id} value={unit.name}>{unit.name}</option>
+            ))}
+          </select>
+          {productErrors.unit && <p className="text-red-600 text-xs mt-1">{productErrors.unit}</p>}
+        </div>
+        {/* Category */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+          <select
+            value={productForm.category_id}
+            onChange={e => setProductForm({ ...productForm, category_id: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.category_id ? 'border-red-500' : 'border-gray-300'}`}
+          >
+            <option value="">Select Category</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+          {productErrors.category_id && <p className="text-red-600 text-xs mt-1">{productErrors.category_id}</p>}
+        </div>
+        {/* Description */}
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+          <textarea
+            value={productForm.description}
+            onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            rows="2"
+          />
+        </div>
+        {/* MRP */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">MRP</label>
+          <input
+            type="number"
+            step="0.01"
+            value={productForm.mrp}
+            onChange={e => setProductForm({ ...productForm, mrp: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.mrp ? 'border-red-500' : 'border-gray-300'}`}
+            min={0}
+          />
+          {productErrors.mrp && <p className="text-red-600 text-xs mt-1">{productErrors.mrp}</p>}
+        </div>
+        {/* Purchase Rate */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Purchase Rate</label>
+          <input
+            type="number"
+            step="0.01"
+            value={productForm.purchase_rate}
+            onChange={e => setProductForm({ ...productForm, purchase_rate: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.purchase_rate ? 'border-red-500' : 'border-gray-300'}`}
+            min={0}
+          />
+          {productErrors.purchase_rate && <p className="text-red-600 text-xs mt-1">{productErrors.purchase_rate}</p>}
+        </div>
+        {/* Sale Rate */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Sale Rate</label>
+          <input
+            type="number"
+            step="0.01"
+            value={productForm.sale_rate}
+            onChange={e => setProductForm({ ...productForm, sale_rate: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.sale_rate ? 'border-red-500' : 'border-gray-300'}`}
+            min={0}
+          />
+          {productErrors.sale_rate && <p className="text-red-600 text-xs mt-1">{productErrors.sale_rate}</p>}
+        </div>
+        {/* GST % */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">GST %</label>
+          <select
+            value={productForm.gst_percentage}
+            onChange={e => setProductForm({ ...productForm, gst_percentage: e.target.value })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.gst_percentage ? 'border-red-500' : 'border-gray-300'}`}
+          >
+            <option value="">Select GST %</option>
+            {gstRates.map(gst => (
+              <option key={gst.id} value={gst.rate}>{gst.rate}%</option>
+            ))}
+          </select>
+          {productErrors.gst_percentage && <p className="text-red-600 text-xs mt-1">{productErrors.gst_percentage}</p>}
+        </div>
+        {/* Current Stock */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Current Stock</label>
+          <input
+            type="number"
+            value={productForm.current_stock}
+            onChange={e => setProductForm({ ...productForm, current_stock: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            min={0}
+            placeholder="Defaults to 0"
+          />
+        </div>
+        {/* Minimum Stock */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Stock</label>
+          <input
+            type="number"
+            value={productForm.minimum_stock}
+            onChange={e => setProductForm({ ...productForm, minimum_stock: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            min={0}
+          />
+        </div>
+      </div>
+      <div className="flex space-x-3">
+        <button
+          onClick={handleAddProduct}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+        >
+          Add Product
+        </button>
+        <button
+          onClick={() => {
+            setShowProductForm(false);
+            setProductForm(initialProductForm);
+            setProductErrors({});
+          }}
+          className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg"
+        >
+          Cancel
+        </button> 
+      </div>
+    </div>
+  </div>
+)}
+
       {/* Purchase Payment History Modal */}
       {showPurchasePaymentHistoryModal && purchasePaymentHistory && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1532,6 +1932,7 @@ const handlePurchasePaymentSubmit = async () => {
                       <div><strong>Status:</strong> {payment.status}</div>
                     </div>
 
+                   
                     {/* Method-specific details - Same structure as SalesHistory.jsx */}
                     {payment.payment_method === 'upi' && payment.details && (
                       <div className="mt-3 grid grid-cols-2 gap-4 text-sm border-t pt-3">
@@ -1584,6 +1985,7 @@ const handlePurchasePaymentSubmit = async () => {
                 }}
               >
                 Close
+                
               </button>
             </div>
           </div>
@@ -1591,6 +1993,7 @@ const handlePurchasePaymentSubmit = async () => {
       )}
        {/* <ToastContainer position="top-right" autoClose={3000} /> */}
     </div>
+  
     </PinProtected>
   ); 
 }; 

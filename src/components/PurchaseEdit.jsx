@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Save, History } from 'lucide-react';
+import { Plus, Trash2, Save, History ,ArrowLeft} from 'lucide-react';
 import { toast } from 'react-toastify';
-import ReactDOM from 'react-dom';
+import ReactDOM from 'react-dom'; 
 
 const DropdownPortal = ({ children, anchorRef, show }) => {
   const [style, setStyle] = useState({});
@@ -153,10 +153,12 @@ const PurchaseEdit = () => {
   };
 
   // Item dropdown logic
-  const getFilteredItems = (search) =>
-    items.filter(i =>
-      i.name.toLowerCase().includes((search || '').toLowerCase())
-    );
+const getFilteredItems = (search) =>
+  items.filter(i =>
+    i.name.toLowerCase().includes((search || '').toLowerCase()) ||
+    (i.sku && i.sku.toLowerCase().includes((search || '').toLowerCase()))
+  ); 
+   
   const handleItemInputKeyDown = (e, rowIdx) => {
     const filtered = getFilteredItems(itemSearch[rowIdx]);
     if (showItemList[rowIdx] && filtered.length > 0) {
@@ -351,12 +353,20 @@ const PurchaseEdit = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit Purchase</h1>
-          <p className="text-gray-600">Update purchase details and manage supplier information</p>
-        </div>
+      
+          <div className="flex items-center mb-6">
+        <button
+          onClick={() => navigate('/purchase')}
+          className="flex items-center text-blue-600 hover:text-blue-800 mr-4"
+        >
+          <ArrowLeft className="w-5 h-5 mr-1" />
+          Back to Purchase
+        </button>
+        <h1 className="text-2xl font-bold text-gray-800">Edit Purchase</h1>
+         
       </div>
+      
+    
 
       {/* Purchase Edit Form */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

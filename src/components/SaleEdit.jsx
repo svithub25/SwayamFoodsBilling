@@ -100,10 +100,11 @@ const SaleEdit = () => {
   const [showItemList, setShowItemList] = useState(false);
   const [itemDropdownIndex, setItemDropdownIndex] = useState(0);
   const itemInputRef = useRef();
-
-  const filteredItems = items.filter(i =>
-    i.name.toLowerCase().includes(itemSearch.toLowerCase())
-  );
+ 
+const filteredItems = items.filter(i =>
+  i.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
+  (i.sku && i.sku.toLowerCase().includes(itemSearch.toLowerCase()))
+);
 
   const handleItemInputKeyDown = (e) => {
     if (showItemList && filteredItems.length > 0) {
@@ -135,7 +136,7 @@ const SaleEdit = () => {
           name: item.name,
           hsn_code: item.hsn_code,
           quantity: '',
-          unit_price: '',
+          unit_price: item.mrp, // Use MRP as rate
           total_price: 0
         }
       ]
@@ -151,11 +152,14 @@ const SaleEdit = () => {
   const updateSaleItem = (idx, field, value) => {
     setForm(f => {
       const items = [...f.items];
-      items[idx][field] = value;
-      // Update total_price
-      const qty = parseFloat(items[idx].quantity) || 0;
-      const rate = parseFloat(items[idx].unit_price) || 0;
-      items[idx].total_price = qty * rate;
+      if (field === 'quantity') {
+        items[idx][field] = value;
+        // Update total_price
+        const qty = parseFloat(items[idx].quantity) || 0;
+        const rate = parseFloat(items[idx].unit_price) || 0;
+        items[idx].total_price = qty * rate;
+      }
+      // Do not allow rate change
       return { ...f, items };
     });
   };
@@ -360,43 +364,43 @@ const SaleEdit = () => {
               </tr>
             </thead>
             <tbody>
-              {form.items.map((item, idx) => (
-                <tr key={idx} className="border-b">
-                  <td className="px-4 py-2">{item.name}</td>
-                  <td className="px-4 py-2">{item.hsn_code || 'N/A'}</td>
-                  <td className="px-4 py-2">
-                    <input
-                      id={`qty-input-${idx}`}
-                      type="number"
-                      onWheel={e => e.target.blur()}
-                      value={item.quantity}
-                      min={1}
-                      onChange={e => updateSaleItem(idx, 'quantity', e.target.value)}
-                      className="w-20 px-2 py-1 border border-gray-300 rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    <input
-                      type="number"
-                      onWheel={e => e.target.blur()}
-                      value={item.unit_price}
-                      min={0}
-                      step={0.01}
-                      onChange={e => updateSaleItem(idx, 'unit_price', e.target.value)}
-                      className="w-24 px-2 py-1 border border-gray-300 rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
-                  <td className="px-4 py-2">
-                    <button
-                      onClick={() => removeSaleItem(idx)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {form.items.map((item, idx) => {
+                // Only allow changing quantity, not rate
+                return (
+                  <tr key={idx} className="border-b">
+                    <td className="px-4 py-2">{item.name}</td>
+                    <td className="px-4 py-2">{item.hsn_code || 'N/A'}</td>
+                    <td className="px-4 py-2">
+                      <input
+                        id={`qty-input-${idx}`}
+                        type="number"
+                        onWheel={e => e.target.blur()}
+                        value={item.quantity}
+                        min={1}
+                        onChange={e => updateSaleItem(idx, 'quantity', e.target.value)}
+                        className="w-20 px-2 py-1 border border-gray-300 rounded"
+                      />
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        value={item.unit_price}
+                        disabled
+                        className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
+                    <td className="px-4 py-2">
+                      <button
+                        onClick={() => removeSaleItem(idx)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

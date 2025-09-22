@@ -100,6 +100,18 @@ getApprovalHistory: (saleId) => ipcRenderer.invoke('get-approval-history', saleI
 savePurchasePayment: (paymentData) => ipcRenderer.invoke('save-purchase-payment', paymentData),
 getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-payment-details', purchaseId),
 
+ 
+
+  getExportInventoryData: () => ipcRenderer.invoke('get-export-inventory-data'),
+    getExportSalesData: (startDate, endDate) => ipcRenderer.invoke('get-export-sales-data', startDate, endDate),
+      getExportPurchaseData: (startDate, endDate) => ipcRenderer.invoke('get-export-purchase-data', startDate, endDate),
+
+
+
+
+
+
+
 
 });
 

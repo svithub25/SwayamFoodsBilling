@@ -69,7 +69,9 @@ const Billing = () => {
 
   // --- Fast item search and add ---
   const filteredItems = items.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) && item.current_stock > 0
+    (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
+    && item.current_stock > 0
   );
 
   const handleSearchKeyDown = (e) => {
@@ -504,10 +506,10 @@ const getFinalTotal = () => {
                     </button>
                   </div>
                   <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
-                  <p className="text-sm text-gray-600 mb-1">HSN: {item.hsn_code}</p>
+                  {item.hsn_code && <p className="text-sm text-gray-600 mb-1">HSN: {item.hsn_code}</p>}
                   <p className="text-sm text-gray-600 mb-2">Stock: {item.current_stock} {item.unit}</p>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-gray-900">₹{item.sale_rate}</span>
+                  <div className="flex items-center justify-between mb-3"> 
+                    <span className="text-lg font-bold text-gray-900">₹{item.mrp}</span>
                   </div>
                   <button
                     onClick={() => addToCart(item)}
@@ -717,7 +719,7 @@ const getFinalTotal = () => {
         sku: item.sku,
         name: item.name,
         quantity: parseInt(item.quantity) || 0,
-        unit_price: item.unit_price
+        unit_price: item.unit_price 
       }))}
       discount={discount}
       subtotal={getSubtotal()}
