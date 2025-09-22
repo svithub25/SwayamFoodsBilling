@@ -50,6 +50,7 @@ const Billing = () => {
   const loadItems = async () => {
     try {
       const data = await window.electronAPI.getInventory();
+      console.log('Loaded items:', data); 
       setItems(data);
     } catch (error) {
       console.error('Error loading items:', error);
@@ -124,7 +125,7 @@ const Billing = () => {
         return newCart;
       });
     }
-  };
+  }; 
 
   // --- Cart keyboard controls ---
   const handleCartKeyDown = (e, idx, itemId) => {
@@ -309,7 +310,8 @@ const getFinalTotal = () => {
   const showPurchaseHistory = async (itemId) => {
     try {
       const history = await window.electronAPI.getItemPurchaseHistory(itemId);
-      setItemHistory(history || []);
+      console.log('Item Purchase History:', history); 
+      setItemHistory(history || []); 
       setShowItemHistory(itemId);
     } catch (error) {
       setItemHistory([]);
@@ -502,14 +504,14 @@ const getFinalTotal = () => {
                       onClick={() => showPurchaseHistory(item.id)}
                       className="text-gray-400 hover:text-gray-600"
                     >
-                      <History className="w-4 h-4" />
+                      <History className="w-4 h-4" /> 
                     </button>
                   </div>
                   <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
                   {item.hsn_code && <p className="text-sm text-gray-600 mb-1">HSN: {item.hsn_code}</p>}
                   <p className="text-sm text-gray-600 mb-2">Stock: {item.current_stock} {item.unit}</p>
                   <div className="flex items-center justify-between mb-3"> 
-                    <span className="text-lg font-bold text-gray-900">₹{item.mrp}</span>
+                    <span className="text-lg font-bold text-gray-900">₹{item.customer_rate}</span>
                   </div>
                   <button
                     onClick={() => addToCart(item)}
@@ -678,7 +680,7 @@ const getFinalTotal = () => {
               >
                 <span className="text-xl">×</span>
               </button>
-            </div>
+            </div> 
             {itemHistory.length > 0 ? (
               <div className="space-y-3">
                 {itemHistory.map((record, index) => (

@@ -1658,16 +1658,9 @@ ipcMain.handle('get-machine-id', async () => {
 
 // License management
 function getPythonMachineId() {
-  try {
-    // Runs python script and gets stdout
-    const output = execSync("python get_machine_id.py", {
-      encoding: "utf8",
-    }).trim();
-    return output;
-  } catch (err) {
-    console.error("Failed to get machine ID from Python:", err);
+  
     return null;
-  }
+ 
 }
 
 // Activate license: save current machine ID
