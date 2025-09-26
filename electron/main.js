@@ -139,6 +139,7 @@ function initDatabase() {
     sgst_total REAL DEFAULT 0,
     is_paid INTEGER DEFAULT 0,
     is_approved INTEGER DEFAULT 0,
+    payment_method TEXT,
     status_code INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
