@@ -226,12 +226,15 @@ const getFinalTotal = () => {
 
       const saleItems = filteredCart.map(item => {
         const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
+        const origItem = items.find(i => i.id === item.id); // <-- Define origItem here
         return {
           id: item.id,
           quantity: parseInt(item.quantity),
           unit_price: item.unit_price, 
           gst_percentage: item.gst_percentage,
-          total_price: totalAmount
+          total_price: totalAmount,
+          customer_rate: origItem?.customer_rate ?? item.unit_price,   // <-- Add customer_rate
+          salesman_rate: origItem?.salesman_rate ?? item.unit_price    // <-- Add salesman_rate
         };
       });
       const saleData = {
@@ -245,7 +248,8 @@ const getFinalTotal = () => {
         discount,
         total_amount: getFinalTotal(),
         rounding_off: getRoundingOff(),
-        salesman_id: selectedSalesman || null
+        salesman_id: selectedSalesman || null,
+        sale_type: isSalesmanCustomer ? 'salesman' : 'customer' // <-- ADD THIS
       };
       if (window.electronAPI) {
         await window.electronAPI.saveSale(saleData);

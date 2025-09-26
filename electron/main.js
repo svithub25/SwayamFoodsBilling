@@ -131,6 +131,7 @@ function initDatabase() {
     customer_address TEXT,
     customer_gstin TEXT,
     salesman_id INTEGER DEFAULT NULL,
+    sale_type TEXT DEFAULT 'customer',
     sale_date DATE NOT NULL,
     discount REAL DEFAULT 0,
     total_amount REAL NOT NULL,
@@ -138,6 +139,7 @@ function initDatabase() {
     cgst_total REAL DEFAULT 0,
     sgst_total REAL DEFAULT 0,
     is_paid INTEGER DEFAULT 0,
+    
     is_approved INTEGER DEFAULT 0,
     payment_method TEXT,
     status_code INTEGER DEFAULT 0,
@@ -154,6 +156,9 @@ function initDatabase() {
     cgst_amount REAL NOT NULL DEFAULT 0,
     sgst_amount REAL NOT NULL DEFAULT 0,
     total_price REAL NOT NULL,
+    sale_type TEXT DEFAULT 'customer',
+    customer_rate REAL DEFAULT 0,
+    salesman_rate REAL DEFAULT 0,
     status_code INTEGER DEFAULT 0,
     FOREIGN KEY (sale_id) REFERENCES sales (id),
     FOREIGN KEY (item_id) REFERENCES items (id)
@@ -715,16 +720,40 @@ ipcMain.handle('generate-bill-number', async () => {
   return `SH/${yearSuffix}/${nextNumber.toString().padStart(0, '0')}`;
 });
 
-ipcMain.handle('save-sale', async (event, { bill_number, customer_name, customer_contact, customer_address, customer_gstin, sale_date, items, discount, total_amount, rounding_off, salesman_id }) => {
-  const saleStmt = db.prepare('INSERT INTO sales (bill_number, customer_name, customer_contact, customer_address, customer_gstin, sale_date, discount, total_amount, rounding_off, salesman_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  const saleResult = saleStmt.run(bill_number, customer_name, customer_contact, customer_address, customer_gstin, sale_date, discount, total_amount, rounding_off, salesman_id);
+ipcMain.handle('save-sale', async (event, saleData) => {
+  const {
+    bill_number, customer_name, customer_contact, customer_address, customer_gstin,
+    sale_date, items, discount, total_amount, rounding_off, salesman_id, sale_type
+  } = saleData;
+
+  // Save sale_type at sale level
+  const saleStmt = db.prepare(
+    'INSERT INTO sales (bill_number, customer_name, customer_contact, customer_address, customer_gstin, sale_date, discount, total_amount, rounding_off, salesman_id, sale_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  );
+  const saleResult = saleStmt.run(
+    bill_number, customer_name, customer_contact, customer_address, customer_gstin,
+    sale_date, discount, total_amount, rounding_off, salesman_id, sale_type || 'customer'
+  );
   const saleId = saleResult.lastInsertRowid;
 
-  const saleItemStmt = db.prepare('INSERT INTO sale_items (sale_id, item_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?)');
+  // Save sale_type and rates at item level
+  const saleItemStmt = db.prepare(
+    `INSERT INTO sale_items (sale_id, item_id, quantity, unit_price, total_price, sale_type, customer_rate, salesman_rate)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
   const updateStockStmt = db.prepare('UPDATE items SET current_stock = current_stock - ? WHERE id = ?');
 
   items.forEach(item => {
-    saleItemStmt.run(saleId, item.id, item.quantity, item.unit_price, item.total_price);
+    saleItemStmt.run(
+      saleId,
+      item.id,
+      item.quantity,
+      item.unit_price,
+      item.total_price,
+      sale_type || 'customer',
+      item.customer_rate,      // <-- Save customer_rate
+      item.salesman_rate       // <-- Save salesman_rate
+    );
     updateStockStmt.run(item.quantity, item.id);
   });
 
@@ -2249,3 +2278,56 @@ ipcMain.handle('get-export-purchase-data', async (event, { startDate, endDate })
     ORDER BY p.purchase_date DESC
   `).all(startDate, endDate);
 });
+
+
+
+// ...existing code...
+// ...existing code...
+ipcMain.handle('get-Salesman-Commission', async () => {
+  // Get all sales where sale_type is 'customer'
+  const sales = db.prepare(`
+    SELECT s.id as sale_id, s.bill_number, s.sale_date, s.salesman_id, salesman.name as salesman_name
+    FROM sales s
+    LEFT JOIN salesman ON s.salesman_id = salesman.id
+    WHERE s.sale_type = 'customer' AND (s.status_code = 0 OR s.status_code IS NULL)
+    ORDER BY s.sale_date DESC
+  `).all();
+
+  // For each sale, get items and calculate commission
+  const commissionData = [];
+  for (const sale of sales) {
+    const items = db.prepare(`
+      SELECT si.*, i.name as item_name
+      FROM sale_items si
+      LEFT JOIN items i ON si.item_id = i.id
+      WHERE si.sale_id = ? AND si.sale_type = 'customer'
+    `).all(sale.sale_id);
+
+    let totalCommission = 0;
+    const itemCommissions = items.map(item => {
+      // Use rates from sale_items table
+      const commission = (item.customer_rate - item.salesman_rate) * item.quantity;
+      totalCommission += commission;
+      return {
+        item_name: item.item_name,
+        quantity: item.quantity,
+        customer_rate: item.customer_rate,
+        salesman_rate: item.salesman_rate,
+        commission: commission
+      };
+    });
+
+    commissionData.push({
+      sale_id: sale.sale_id,
+      bill_number: sale.bill_number,
+      sale_date: sale.sale_date,
+      salesman_id: sale.salesman_id,
+      salesman_name: sale.salesman_name,
+      items: itemCommissions,
+      totalCommission
+    });
+  }
+
+  return commissionData;
+});
+// ...existing code...

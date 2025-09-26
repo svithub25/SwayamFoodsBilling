@@ -26,7 +26,8 @@ const SalesHistory = () => {
     endDate: '',
     customer: '',
     item: '',
-    salesman: ''
+    salesman: '',
+    billNumber: ''
   });
   const [items, setItems] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
@@ -78,11 +79,29 @@ const SalesHistory = () => {
     fetchSalesmen();
   }, []);
 
+  const highlightText = (text, highlight) => {
+  if (!highlight) return text;
+  const regex = new RegExp(`(${highlight})`, 'gi');
+  const parts = String(text).split(regex);
+  return parts.map((part, i) =>
+    regex.test(part) ? <mark key={i} className="bg-yellow-200">{part}</mark> : part
+  );
+};
+
   // Direct filter on type
       const fetchFiltered = async () => {
       setLoading(true);
       try {
         const data = await window.electronAPI.getFilteredSales(filters);
+        data.sort((a, b) => {
+      // Example bill: SH/25-26/5
+      // Extract last number after last slash
+      const getBillNum = bill => {
+        const parts = bill.split('/');
+        return parseInt(parts[parts.length - 1], 10) || 0;
+      };
+      return getBillNum(b.bill_number) - getBillNum(a.bill_number);
+    });
         setSales(data);
       } catch (error) {
         console.error('Error applying filters:', error);
@@ -93,15 +112,41 @@ const SalesHistory = () => {
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      fetchFiltered();
-    }, 300); // 300ms debounce
+      // Only call API for filters that need backend processing
+      const backendFilters = {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        item: filters.item,
+        salesman: filters.salesman
+        // Exclude billNumber and customer - they're filtered on frontend
+      };
+      
+      // Only make API call if backend filters have values
+      const hasBackendFilters = Object.values(backendFilters).some(val => val);
+      if (hasBackendFilters) {
+        fetchFiltered();
+      } else {
+        // If no backend filters, just load all sales
+        loadSalesHistory();
+      }
+    }, 300);
+    
     return () => clearTimeout(debounceTimeout.current);
     // eslint-disable-next-line
-  }, [filters]); 
+  }, [filters.startDate, filters.endDate, filters.item, filters.salesman]); // Only watch backend filter fields
 
   const loadSalesHistory = async () => {
     try {
-      const data = await window.electronAPI.getSalesHistory();  
+      const data = await window.electronAPI.getSalesHistory(); 
+      data.sort((a, b) => {
+      // Example bill: SH/25-26/5
+      // Extract last number after last slash
+      const getBillNum = bill => {
+        const parts = bill.split('/');
+        return parseInt(parts[parts.length - 1], 10) || 0;
+      };
+      return getBillNum(b.bill_number) - getBillNum(a.bill_number);
+    }); 
       setSales(data);
     } catch (error) {
       console.error('Error loading sales history:', error);
@@ -116,7 +161,8 @@ const clearFilters = () => {
     endDate: '',
     customer: '',
     item: '', 
-    salesman: ''
+    salesman: '',
+    billNumber: '' // Add this
   });
 };
 
@@ -328,6 +374,19 @@ const clearFilters = () => {
     }
   };
 
+  const filteredSales = sales.filter(sale => {
+    const matchStartDate = !filters.startDate || new Date(sale.sale_date) >= new Date(filters.startDate);
+    const matchEndDate = !filters.endDate || new Date(sale.sale_date) <= new Date(filters.endDate);
+    const matchCustomer = !filters.customer || (sale.customer_name && sale.customer_name.toLowerCase().includes(filters.customer.toLowerCase()));
+    const matchItem = !filters.item || (sale.items && sale.items.some(i => i.item_name.toLowerCase().includes(filters.item.toLowerCase())));
+    const matchSalesman = !filters.salesman || sale.salesman_id === filters.salesman;
+    const matchBill =
+      !filters.billNumber ||
+      sale.bill_number.toLowerCase().includes(filters.billNumber.toLowerCase());
+
+    return matchStartDate && matchEndDate && matchCustomer && matchItem && matchSalesman && matchBill;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -468,6 +527,17 @@ const clearFilters = () => {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bill Number</label>
+            <input
+              type="text"
+              value={filters.billNumber}
+              onChange={e => setFilters({ ...filters, billNumber: e.target.value })}
+              placeholder="Enter bill number"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
         
         <div className="flex space-x-3">
@@ -523,10 +593,10 @@ const clearFilters = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sales.map((sale) => (
+              {filteredSales.map((sale) => (
                 <tr key={sale.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {sale.bill_number}
+                    {highlightText(sale.bill_number, filters.billNumber)} 
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>

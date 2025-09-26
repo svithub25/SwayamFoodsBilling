@@ -105,7 +105,9 @@ getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-paym
   getExportInventoryData: () => ipcRenderer.invoke('get-export-inventory-data'),
     getExportSalesData: (startDate, endDate) => ipcRenderer.invoke('get-export-sales-data', startDate, endDate),
       getExportPurchaseData: (startDate, endDate) => ipcRenderer.invoke('get-export-purchase-data', startDate, endDate),
-
+// ...existing code...
+getSalesmanCommission: () => ipcRenderer.invoke('get-Salesman-Commission'),
+// ...existing code...
 
 
 
