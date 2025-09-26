@@ -56,7 +56,7 @@ const Admin = () => {
     salesman_rate: '',
     gst_percentage: '',
     category_id: '', 
-    current_stock: '',
+    current_stock: 0,
     minimum_stock: 10
   };
   const [productForm, setProductForm] = useState(initialProductForm);
@@ -698,12 +698,12 @@ const Admin = () => {
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button
+                          {/* <button
                             onClick={() => handleDeleteProduct(product.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </td>
                       </tr>
                     ))}
@@ -1183,12 +1183,12 @@ const Admin = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Current Stock</label>
                 <input
                   type="number"
-                  onWheel={e => e.target.blur()} 
+                  
                   value={productForm.current_stock}
-                  onChange={(e) => setProductForm({ ...productForm, current_stock: e.target.value })}
+                  readOnly
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   min={0}
-                  placeholder="Defaults to 0"
+                  placeholder="0"
                 />
               </div>
 
