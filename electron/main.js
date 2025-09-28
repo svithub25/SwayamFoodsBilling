@@ -752,7 +752,7 @@ ipcMain.handle('generate-bill-number', async () => {
     SELECT bill_number FROM sales 
     WHERE bill_number LIKE ?
     ORDER BY id DESC LIMIT 1
-  `).get(`SH/${yearSuffix}/%`);
+  `).get(`SF/${yearSuffix}/%`);
 
   let nextNumber = 1;
   if (lastBill && lastBill.bill_number) {
@@ -761,9 +761,9 @@ ipcMain.handle('generate-bill-number', async () => {
     if (match && match[1]) {
       nextNumber = parseInt(match[1], 10) + 1;
     }
-  }
+  } 
  
-  return `SH/${yearSuffix}/${nextNumber.toString().padStart(0, '0')}`;
+  return `SF/${yearSuffix}/${nextNumber.toString().padStart(0, '0')}`;
 });
 
 ipcMain.handle('save-sale', async (event, saleData) => {
@@ -2374,7 +2374,7 @@ ipcMain.handle('get-app-info', async () => {
     description: pkg.description || '',
     author: pkg.author || '',
     company: pkg.company || '',
-    license: 'Shiva Books & Stationers', // Hardcoded license info
+    license: 'Swayam Foods', // Hardcoded license info
     homepage: pkg.homepageUrl || pkg.homepage || '',
     repository: pkg.repository?.url || '',
     bugs: pkg.bugs?.url || '',
