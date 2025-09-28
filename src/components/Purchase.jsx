@@ -5,7 +5,7 @@ import {
   Trash2, 
   Save, 
   Lock,
-  Calendar,
+  Calendar,       
   Package,
   RefreshCw,
   Eye,
@@ -52,7 +52,7 @@ const Purchase = () => {
   const [purchaseHistory, setPurchaseHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showNewSupplierForm, setShowNewSupplierForm] = useState(false);
-  
+  const [overallDiscount, setOverallDiscount] = useState(0);
 
 const [categories, setCategories] = useState([]);
 const [units, setUnits] = useState([]);
@@ -285,12 +285,23 @@ const handlePurchasePaymentSubmit = async () => {
     }
   };
 
-
-
+const updateOverallDiscount = (newDiscount) => {
+  setOverallDiscount(newDiscount);
+  
+  // Apply to all existing items that haven't been manually changed
+  setPurchaseForm(prev => ({
+    ...prev,
+    items: prev.items.map(item => ({
+      ...item,
+      discount: newDiscount
+    }))
+  }));
+};
   const addItemToPurchase = () => { 
     setPurchaseForm({
       ...purchaseForm,
-      items: [...purchaseForm.items, { id: '', quantity: '', unit_price: '', total_price: 0, discount: 0 }]
+      items: [...purchaseForm.items, { id: '', quantity: '', unit_price: '', total_price: 0, 
+      discount: overallDiscount }]
     });
   };
 
@@ -388,37 +399,43 @@ const handlePurchasePaymentSubmit = async () => {
 
     const total_amount = getFinalTotal();
     const rounding_off = getRoundingOff();
+ 
+    const cgst_total = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
 
-      const cgst_total = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const gstRate = selectedItem?.gst_percentage || 0;
-    const baseAmount = item.quantity * item.unit_price;
-    return sum + (baseAmount * gstRate) / 200;
-  }, 0); 
-
-  const sgst_total = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const gstRate = selectedItem?.gst_percentage || 0;
-    const baseAmount = item.quantity * item.unit_price;
-    return sum + (baseAmount * gstRate) / 200;
-  }, 0);
+const sgst_total = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
 
     // Calculate GST for each valid item
-    const itemsWithGST = validItems.map(item => {
-      const selectedItem = items.find(i => i.id == item.id);
-      const baseAmount = item.quantity * item.unit_price;
-      const gstRate = selectedItem?.gst_percentage || 0;
-      const cgstAmount = (baseAmount * gstRate) / 200;
-      const sgstAmount = (baseAmount * gstRate) / 200;
-      const totalPrice = baseAmount + cgstAmount + sgstAmount;
-      return {
-        ...item,
-        gst_percentage: gstRate,
-        cgst_amount: cgstAmount,
-        sgst_amount: sgstAmount,
-        total_price: totalPrice
-      };
-    });
+const itemsWithGST = validItems.map(item => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const cgstAmount = (discountedAmount * gstRate) / 200;
+  const sgstAmount = (discountedAmount * gstRate) / 200;
+  const totalPrice = discountedAmount + cgstAmount + sgstAmount;
+  return {
+    ...item, 
+    gst_percentage: gstRate,
+    cgst_amount: cgstAmount,
+    sgst_amount: sgstAmount,
+    total_price: totalPrice
+  };
+});
 
  
 
@@ -611,36 +628,49 @@ const getFilteredItems = (search) =>
     } 
   };
 
-  // Calculate subtotal (after per-item discount)
-  const subtotal = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const baseAmount = item.quantity * item.unit_price;
-    const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
-    return sum + (baseAmount - itemDiscount);
-  }, 0);
+  // --- Subtotal (before any discount) ---
+const subtotal = purchaseForm.items.reduce((sum, item) => {
+  const baseAmount = item.quantity * item.unit_price;
+  return sum + baseAmount;
+}, 0);
 
-  // Overall discount
-  const overallDiscountAmount = purchaseForm.discount ? (subtotal * purchaseForm.discount) / 100 : 0;
-  const subtotalAfterOverallDiscount = subtotal - overallDiscountAmount;
+// --- Total discount amount (sum of all item discounts) ---
+const totalDiscountAmount = purchaseForm.items.reduce((sum, item) => {
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  return sum + itemDiscount;
+}, 0);
 
-  // GST on discounted subtotal
-  const gstTotal = purchaseForm.items.reduce((sum, item) => {
-    const selectedItem = items.find(i => i.id == item.id);
-    const gstRate = selectedItem?.gst_percentage || 0;
-    const baseAmount = item.quantity * item.unit_price;
-    const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
-    const discountedAmount = baseAmount - itemDiscount;
-    return sum + (discountedAmount * gstRate) / 100;
-  }, 0);
- 
-  // Total with GST and overall discount
-  const totalWithGst = subtotalAfterOverallDiscount + gstTotal;
+// --- Subtotal after discount ---
+const subtotalAfterDiscount = subtotal - totalDiscountAmount;
 
-  // Rounding off calculation
-  const getRoundingOff = () => {
-    return +(Math.round(totalWithGst) - totalWithGst).toFixed(2);
-  };
-  const getFinalTotal = () => Math.round(totalWithGst);
+// --- CGST/SGST on discounted amount ---
+const cgstTotal = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
+
+const sgstTotal = purchaseForm.items.reduce((sum, item) => {
+  const selectedItem = items.find(i => i.id == item.id);
+  const gstRate = selectedItem?.gst_percentage || 0;
+  const baseAmount = item.quantity * item.unit_price;
+  const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
+  const discountedAmount = baseAmount - itemDiscount;
+  return sum + (discountedAmount * gstRate) / 200;
+}, 0);
+
+// --- Total with GST ---
+const totalWithGst = subtotalAfterDiscount + cgstTotal + sgstTotal;
+
+// --- Rounding off calculation ---
+const getRoundingOff = () => {
+  return +(Math.round(totalWithGst) - totalWithGst).toFixed(2);
+};
+const getFinalTotal = () => Math.round(totalWithGst);
  
   const handleReprintPurchase = async (purchaseId) => {
     try {
@@ -752,15 +782,15 @@ const getFilteredItems = (search) =>
           {/* Supplier Dropdown */}
           <div>
           <div className="flex items-center mb-2">
-    <label className="block text-sm font-medium text-gray-700">Supplier</label>
-    <button
-      onClick={() => setShowNewSupplierForm(true)}
-      className="ml-2 px-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-      tabIndex={0}
-    >
-      <Plus className="w-4 h-4" />
-    </button>
-  </div>
+        <label className="block text-sm font-medium text-gray-700">Supplier</label>
+        <button
+          onClick={() => setShowNewSupplierForm(true)}
+          className="ml-2 px-1 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          tabIndex={-1}
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
             
             <div className="relative">
               <input
@@ -826,6 +856,8 @@ const getFilteredItems = (search) =>
               tabIndex={0}
             />
           </div>
+
+          
         </div>
 
         {/* Items Table */}
@@ -838,7 +870,7 @@ const getFilteredItems = (search) =>
                 className="px-1 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 title="Add New Item"
                 type="button"
-                tabIndex={0}
+                 tabIndex={-1}
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -879,10 +911,18 @@ const getFilteredItems = (search) =>
                     const gstRate = selectedItem?.gst_percentage || 0;
                     const baseAmount = item.quantity * item.unit_price;
                     const itemDiscount = item.discount ? (baseAmount * item.discount) / 100 : 0;
-                    const discountedAmount = baseAmount - itemDiscount;
+                    const discountedAmount = baseAmount - itemDiscount; 
                     const gstAmount = (discountedAmount * gstRate) / 100;
                     const totalWithGst = discountedAmount + gstAmount;
-                    
+                    console.log({
+                      quantity: item.quantity,
+                      unit_price: item.unit_price,
+                      baseAmount,
+                      itemDiscount,
+                      discountedAmount,
+                      gstRate,
+                      gstAmount
+                    });
                     const filtered = getFilteredItems(itemSearch[index]);
                     return (
                       <tr key={index}>
@@ -960,7 +1000,7 @@ const getFilteredItems = (search) =>
                             <button
                               type="button"
                               onClick={() => showPurchaseHistory(item.id)}
-                              className="text-gray-400 hover:text-gray-600"
+                              className="text-blue-600 hover:text-blue-900"
                               title="Show Purchase History (Ctrl+H)"
                               tabIndex={-1}
                             >
@@ -1080,54 +1120,59 @@ const getFilteredItems = (search) =>
             Save Purchase
           </button>
           <div className="flex flex-col items-end space-y-1 order-1 md:order-2 w-full md:w-auto">
-            {/* Subtotal */}
+            {/* Subtotal before discount */}
             <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">Subtotal:</span>
-              <span>
-                ₹{subtotal.toFixed(2)}
-              </span>
+              <span className="font-medium text-gray-700 mr-2">Subtotal :</span>
+              <span>₹{subtotal.toFixed(2)}</span>
+            </div>
+            {/* Discount amount */}
+           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+         
+         
+          <span className="font-medium text-gray-700">Total Discount:</span>
+           <input
+            type="number"
+            value={overallDiscount}
+            onChange={(e) => updateOverallDiscount(parseFloat(e.target.value) || 0)}
+            className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="0"
+            min="0"
+            max="100"
+            step="0.01"
+            tabIndex={0}
+          />
+          <span className="text-red-600 font-semibold">- ₹{totalDiscountAmount.toFixed(2)}</span>
+        </div>
+         
+           
+            {/* Overall Discount input */}
+            <div className="flex justify-between w-full md:w-auto items-center">
+              <label className="block text-base font-medium text-gray-700 mb-2">Overall Discount (%)</label>
+        
             </div>
             {/* CGST */}
             <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">CGST:</span>
-              <span>
-                ₹{purchaseForm.items.reduce((sum, item) => {
-                  const selectedItem = items.find(i => i.id == item.id);
-                  const gstRate = selectedItem?.gst_percentage || 0;
-                  const baseAmount = item.quantity * item.unit_price;
-                  const cgst = (baseAmount * gstRate) / 200;
-                  return sum + cgst;
-                }, 0).toFixed(2)}
-              </span>
+              <span className="font-medium text-gray-700 mr-2">Total CGST:</span>
+              <span>₹{cgstTotal.toFixed(2)}</span>
             </div>
             {/* SGST */}
             <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">SGST:</span>
-              <span>
-                ₹{purchaseForm.items.reduce((sum, item) => {
-                  const selectedItem = items.find(i => i.id == item.id);
-                  const gstRate = selectedItem?.gst_percentage || 0;
-                  const baseAmount = item.quantity * item.unit_price;
-                  const sgst = (baseAmount * gstRate) / 200;
-                  return sum + sgst;
-                }, 0).toFixed(2)}
-              </span>
+              <span className="font-medium text-gray-700 mr-2">Total SGST:</span>
+              <span>₹{sgstTotal.toFixed(2)}</span>
             </div>
-             <div className="flex justify-between w-full md:w-auto">
+            {/* Total with GST */}
+            <div className="flex justify-between w-full md:w-auto">
               <span className="font-medium text-gray-700 mr-2">Total With GST:</span>
-              <span>
-                {totalWithGst} 
-              </span>
+              <span>₹{totalWithGst.toFixed(2)}</span>
             </div>
             {/* Rounding Off */}
             <div className="flex justify-between w-full md:w-auto">
-              <span className='font-medium text-gray-700 mr-2 '>Rounding Off:</span>
+              <span className="font-medium text-gray-700 mr-2">Rounding Off:</span>
               <span>
                 {getRoundingOff() > 0 ? '+' : '-'}₹{Math.abs(getRoundingOff()).toFixed(2)}
               </span>
             </div>
-            
-            {/* Total with GST */}
+            {/* Grand Total */}
             <div className="flex justify-between w-full md:w-auto text-lg font-semibold border-t border-gray-200 pt-2">
               <span>Grand Total:</span>
               <span>₹{getFinalTotal().toFixed(2)}</span>

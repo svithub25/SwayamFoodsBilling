@@ -1,10 +1,28 @@
 {
-  "name": "Billing-Software",
+  "name": "billing-software",
   "private": true, 
   "version": "1.1.0",
-  "type": "module",
+  "type": "module", 
   "main": "electron/main.js",
   "homepage": "./",
+  "description": "Modern billing and commission management software with reporting, charts, and Excel/PDF export.",
+  "author": "Tanmay Joshi",
+  "company": "S V IT HUB",
+  "license": "Proprietary",
+  "copyright": "© 2025 S V IT HUB",
+  "homepageUrl": "https://mybillingapp.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/InfernoTJ/BillingSoftware"
+  },
+ 
+  "support": {
+    "email": "support@mybillingapp.com",
+    "phone": "+91-9876543210"
+  },
+  "releaseDate": "2025-09-26",
+ 
+ 
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "dev:vite": "vite",
@@ -61,21 +79,28 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*",
-      "database.db"
+      "electron/**/*", 
+      "database.db",
+      "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "electron/favicon.ico"
+      "target": ["nsis", "portable"],
+      "icon": "electron/favicon.ico",
+      "publisherName": "Tanmay Joshi"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Billing Software",
+    "uninstallDisplayName": "Billing Software",
+    "license": "electron/License"
     },
     "extraResources": [
       {
-         "from": "get_machine_id.exe",
-          "to": "get_machine_id.exe"
+        "from": "get_machine_id.exe",
+        "to": "get_machine_id.exe"
       }
     ]
   }

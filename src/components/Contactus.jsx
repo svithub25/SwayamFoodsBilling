@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   MapPin, 
   Phone, 
@@ -15,6 +15,33 @@ import {
 import svilogo from'../Assets/SV ITHub Logo.jpg'; 
 
 const Contactus = () => {
+  const [appInfo, setAppInfo] = useState({});
+
+  useEffect(() => {
+    window.electronAPI.getAppInfo().then(info => {
+      setAppInfo(info);
+    }); 
+  }, []);
+
+  // Map fields for display
+  const appFields = [
+    { label: 'Software Name', value: appInfo.productName },
+    // { label: 'Internal Name', value: appInfo.name },
+    { label: 'Version', value: 'v' + appInfo.version },
+    // { label: 'Description', value: appInfo.description },
+    // { label: 'Author', value: appInfo.author },
+    // { label: 'Company', value: appInfo.company },
+    { label: 'License To', value: appInfo.license }
+    // { label: 'Copyright', value: appInfo.copyright },
+    // { label: 'Homepage', value: appInfo.homepage },
+    // { label: 'Repository', value: appInfo.repository },
+    // { label: 'Bug Tracker', value: appInfo.bugs },
+    // { label: 'Support Email', value: appInfo.supportEmail },
+    // { label: 'Support Phone', value: appInfo.supportPhone },
+    // { label: 'Release/ Date', value: appInfo.releaseDate },
+    // { label: 'Built With', value: Array.isArray(appInfo.builtWith) ? appInfo.builtWith.join(', ') : appInfo.builtWith },
+    // { label: 'Changelog', value: appInfo.changelog }
+  ];
 
     return (
      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -50,12 +77,13 @@ const Contactus = () => {
                     <MapPin className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Testing Address</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Address</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      425 Business Center Drive<br />
-                      Suite 200<br />        
-                      Devkar Panand<br /> 
-                      India
+                      Plot No. 18<br />
+                      Sangam Colony<br />        
+                      Amrut Nagar Sarnobatwadi<br /> 
+                      
+                      Kolhapur , India
                     </p>
                   </div>  
                 </div>
@@ -72,23 +100,23 @@ const Contactus = () => {
                     <div className="space-y-1 text-gray-600">
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Main:</span>
-                        <span className="font-medium">9373893048</span>
+                        <span className="font-medium">8552872020</span>
                       </p>
-                      <p className="flex items-center">
+                      {/* <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Fax:</span>
                         <span className="font-medium">(555) 123-4568</span>
                       </p>
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Support:</span>
                         <span className="font-medium">(555) 123-4569</span>
-                      </p>
+                      </p> */}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Email Card */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <div className="bg-white rounded-2xl p-6 shadow-lg col-span-2 hover:shadow-xl transition-shadow duration-300">
                 <div className="flex items-start space-x-4">
                   <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Mail className="w-5 h-5 text-purple-600" />
@@ -97,13 +125,13 @@ const Contactus = () => {
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Email Contacts</h3>
                     <div className="space-y-1 text-gray-600">
                       <p className="flex items-center">
-                        <span className="text-sm text-gray-500 w-16">General:</span>
+                       
                         <span className="font-medium">svithub25@gmail.com</span>
                       </p>
-                      <p className="flex items-center">
+                      {/* <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Billing:</span>
-                        <span className="font-medium">testingclient123@sterling.com</span>
-                      </p>
+                        <span className="font-medium">billing@sterling.com</span>
+                      </p> */}
                       
                     </div>
                   </div>
@@ -111,7 +139,7 @@ const Contactus = () => {
               </div>
 
               {/* Website Card */}
-              <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              {/* <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
                 <div className="flex items-start space-x-4">
                   <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Globe className="w-5 h-5 text-orange-600" />
@@ -130,11 +158,11 @@ const Contactus = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             {/* Business Hours */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg">
+            {/* <div className="bg-white rounded-2xl p-6 shadow-lg">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
                   <Clock className="w-5 h-5 text-indigo-600" />
@@ -179,103 +207,25 @@ const Contactus = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
-          {/* Right Column - Company Info & Stats */}
+          {/* Right Column - Software Info */}
           <div className="space-y-6">
-            
-            {/* Company Stats */}
             <div className="bg-white rounded-2xl p-6 shadow-lg">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">About Our Firm</h3>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">150+</p>
-                    <p className="text-sm text-gray-600">Team Members</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">25</p>
-                    <p className="text-sm text-gray-600">Years Experience</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Award className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">500+</p>
-                    <p className="text-sm text-gray-600">Happy Clients</p>
-                  </div>
-                </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Software Information</h3>
+              <div className="space-y-3 text-sm">
+                {appFields.map(
+                  field =>
+                    field.value && (
+                      <div key={field.label}>
+                        <span className="text-gray-500">{field.label}:</span>
+                        <span className="ml-2 font-medium text-gray-900 break-all">{field.value}</span>
+                      </div>
+                    )
+                )}
               </div>
             </div>
-
-            {/* Registration Info */}
-            {/* <div className="bg-white rounded-2xl p-6 shadow-lg">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Software Registration Details</h3>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-gray-500">Tax ID:</span>
-                  <span className="ml-2 font-medium text-gray-900">12-3456789</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Business License:</span>
-                  <span className="ml-2 font-medium text-gray-900">BL-2024-NY-001</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Founded:</span>
-                  <span className="ml-2 font-medium text-gray-900">1999</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Entity Type:</span>
-                  <span className="ml-2 font-medium text-gray-900">LLC</span>
-                </div>
-              </div>
-            </div> */}
-            <div className="bg-white rounded-2xl p-6 shadow-lg">
-  <h3 className="text-lg font-semibold text-gray-900 mb-4">Software Registration Details</h3>
-  <div className="space-y-3 text-sm">
-    <div>
-      <span className="text-gray-500">Software Name:</span>
-      <span className="ml-2 font-medium text-gray-900">Sterling ERP Suite</span>
-    </div>
-    <div>
-      <span className="text-gray-500">Version:</span>
-      <span className="ml-2 font-medium text-gray-900">v2.5.1</span>
-    </div>
-    <div>
-      <span className="text-gray-500">License Key:</span>
-      <span className="ml-2 font-medium text-gray-900">XXXX-XXXX-XXXX-XXXX</span>
-    </div>
-    <div>
-      <span className="text-gray-500">Registered To:</span>
-      <span className="ml-2 font-medium text-gray-900"> S V IT Hub</span>
-    </div>
-    <div>
-      <span className="text-gray-500">Support Expiry:</span>
-      <span className="ml-2 font-medium text-gray-900">31-Dec-2025</span>
-    </div>
-    <div>
-      <span className="text-gray-500">Activation Date:</span>
-      <span className="ml-2 font-medium text-gray-900">01-Jan-2024</span>
-    </div>
-    <div>
-      <span className="text-gray-500">License Type:</span>
-      <span className="ml-2 font-medium text-gray-900">Enterprise Annual</span>
-    </div>
-  </div>
-</div>
 
             {/* Social Media */}
             <div className="bg-white rounded-2xl p-6 shadow-lg">

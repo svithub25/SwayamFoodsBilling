@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
-  ShoppingCart, 
+  ShoppingCart,  
   ReceiptIndianRupee,
   FileText,
   BookOpen,  
@@ -25,6 +25,8 @@ import 'react-toastify/dist/ReactToastify.css';
 const Layout = ({ children, user, onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation(); 
+  const [overallDiscount, setOverallDiscount] = useState(0);
+
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -34,7 +36,7 @@ const Layout = ({ children, user, onLogout }) => {
     { name: 'Billing', href: '/billing', icon: ReceiptIndianRupee },
     { name: 'Sales History', href: '/sales-history', icon: FileText },
     { name: 'Salesman Commission', href: '/salesman-commission', icon: IndianRupee },
-    { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
+    // { name: 'Ledger', href: '/ledger', icon: BookOpen }, 
     { name: 'Analytics', href: '/analytics', icon: BarChart3 }, 
     { name: 'Export', href: '/export', icon: Download }, 
     { name: 'Backup', href: '/backup', icon: Database },

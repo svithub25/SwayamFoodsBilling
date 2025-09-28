@@ -1,6 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
+
+contextBridge.exposeInMainWorld('electronAPI', { 
+
+
+
+ getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+
+
   // Authentication
   login: (username, password) => ipcRenderer.invoke('login', username, password),
   verifyPin: (pin) => ipcRenderer.invoke('verify-pin', pin),
@@ -78,7 +85,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Customers
   createCustomerIfNeeded: (customer) => ipcRenderer.invoke('create-customer-if-needed', customer),
-
+  getCustomers: () => ipcRenderer.invoke('get-customers'),
+  addCustomer: (customer) => ipcRenderer.invoke('add-customer', customer),
+  updateCustomer: (customer) => ipcRenderer.invoke('update-customer', customer),
+  deleteCustomer: (id) => ipcRenderer.invoke('delete-customer', id),
 
 //salesman 
 
@@ -109,6 +119,10 @@ getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-paym
 getSalesmanCommission: () => ipcRenderer.invoke('get-Salesman-Commission'),
 // ...existing code...
 
+
+//closing stock 
+  updateClosingStock: (data) => ipcRenderer.invoke('update-closing-stock', data),
+  getClosingStock: (itemId) => ipcRenderer.invoke('get-closing-stock', itemId),
 
 
 

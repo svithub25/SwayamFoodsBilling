@@ -24,13 +24,14 @@ const Admin = () => {
   const [loading, setLoading] = useState(false);
 
 
-  // Data states
+  // Data states 
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [gstRates, setGstRates] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
+  const [customers, setCustomers] = useState([]); // NEW: Customers state
 
   // Form states
   const [showProductForm, setShowProductForm] = useState(false);
@@ -39,8 +40,10 @@ const Admin = () => {
   const [showGstForm, setShowGstForm] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showSalesmanForm, setShowSalesmanForm] = useState(false);
+  const [showCustomerForm, setShowCustomerForm] = useState(false); // NEW: Customers form state
   const [editingItem, setEditingItem] = useState(null);
   const [editingSalesman, setEditingSalesman] = useState(null);
+  const [editingCustomer, setEditingCustomer] = useState(null); // NEW: Editing customer state
 
   // CHANGED: make required fields empty by default; current_stock empty -> will default to 0 on submit
   const initialProductForm = {
@@ -56,7 +59,7 @@ const Admin = () => {
     salesman_rate: '',
     gst_percentage: '',
     category_id: '', 
-    current_stock: 0,
+    current_stock: '',
     minimum_stock: 10
   };
   const [productForm, setProductForm] = useState(initialProductForm);
@@ -81,6 +84,10 @@ const Admin = () => {
     joining_date: ''
   });
   const [salesmanErrors, setSalesmanErrors] = useState({});
+
+  const initialCustomerForm = { name: '', contact: '', address: '' }; // NEW: Initial customer form
+  const [customerForm, setCustomerForm] = useState(initialCustomerForm);
+  const [customerErrors, setCustomerErrors] = useState({}); // NEW: Customer errors state
 
   // Confirm action modal states
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -146,6 +153,13 @@ const Admin = () => {
     return errors;
   };
 
+  const validateCustomerForm = (form) => {
+    const errors = {};
+    if (!form.name || form.name.trim().length < 2) errors.name = 'Name is required';
+    if (!form.contact || form.contact.trim().length < 5) errors.contact = 'Contact is required';
+    return errors;
+  };
+
   const buildProductPayload = (form) => ({
     name: String(form.name).trim(),
     sku: String(form.sku).trim(),
@@ -169,17 +183,21 @@ const Admin = () => {
     loadAllData();
   }, []);
 
+
+
   const loadAllData = async () => {
     setLoading(true);
     try {
-      if (window.electronAPI) {
-        const [productsData, suppliersData, categoriesData, unitsData, gstData, salesmenData] = await Promise.all([
-          window.electronAPI.getInventory(),
+      
+     
+        const [productsData, suppliersData, categoriesData, unitsData, gstData, salesmenData, customersData] = await Promise.all([
+          window.electronAPI.getInventory(), 
           window.electronAPI.getSuppliers(),
           window.electronAPI.getCategories(),
           window.electronAPI.getUnits(),
           window.electronAPI.getGstRates(),
-          window.electronAPI.getSalesmen()
+          window.electronAPI.getSalesmen(),
+          window.electronAPI.getCustomers() // NEW: Load customers data
         ]);
         setProducts(productsData);
         setSuppliers(suppliersData);
@@ -187,109 +205,99 @@ const Admin = () => {
         setUnits(unitsData);
         setGstRates(gstData);
         setSalesmen(salesmenData);
-      } else {
-        // Mock data for web environment
-        setProducts([
-          { id: 1, name: 'Sample Product', sku: 'SP001', mrp: 100, sale_rate: 90, gst_percentage: 18, current_stock: 50 }
-        ]);
-        setSuppliers([
-          { id: 1, name: 'Sample Supplier', contact: '1234567890', gstin: 'GST123' }
-        ]);
-        setCategories([
-          { id: 1, name: 'Sample Category' }
-        ]);
-        setUnits([
-          { id: 1, name: 'pcs' }
-        ]);
-        setGstRates([
-          { id: 1, rate: 18, description: 'Standard Rate' }
-        ]);
-        setSalesmen([
-          { id: 1, name: 'John Doe', contact_info: '9876543210', address: '123 Main St', joining_date: '2023-01-01' }
-        ]);
-      }
+        setCustomers(customersData); // NEW: Set customers data
+     
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
   }; 
-
+ 
   // Product management
   const handleAddProduct = async () => {
-    const errors = validateProductForm(productForm);
-    if (Object.keys(errors).length) {
-      setProductErrors(errors);
-      console.log('Product form errors:', errors);
-      toast.error('Please fill all required fields');
-      return; 
-    } 
-    try {
-      if (window.electronAPI) {
-        // SKU uniqueness check before add
-        const skuExists = await window.electronAPI.checkSkuExists(productForm.sku);
-       
-        
-        if (skuExists) { 
-          setProductErrors({ ...errors, sku: 'SKU already exists' });
-          toast.error('SKU already exists');
-          return;
-        }
-        const payload = buildProductPayload(productForm);
-        const newProduct = await window.electronAPI.addItem(payload);
-        toast.success('Product added successfully');
-        setProducts([...products, newProduct]);
-      }
-      
-      setShowProductForm(false);
-      setProductForm(initialProductForm);
-      setProductErrors({});
-    } catch (error) {
-      if (error?.message?.includes('SKU already exists')) {
-        setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+  const errors = validateProductForm(productForm);
+  if (Object.keys(errors).length) {
+    setProductErrors(errors);
+    toast.error('Please fill all required fields');
+    return;
+  }
+  try { 
+    if (window.electronAPI) {
+      const skuExists = await window.electronAPI.checkSkuExists(productForm.sku);
+      if (skuExists) {
+        setProductErrors({ ...errors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
-      } else {
-        toast.error('Error adding product');
-        console.error('Error adding product:', error);
+        return;
       }
-    }
-  };
+      const payload = buildProductPayload(productForm);
+      const newProduct = await window.electronAPI.addItem(payload);
 
-  const handleUpdateProduct = async () => {
-    const errors = validateProductForm(productForm);
-    if (Object.keys(errors).length) {
-      setProductErrors(errors);
-      return;
+      // --- Update closing stock after adding product ---
+      await window.electronAPI.updateClosingStock({
+        itemId: newProduct.id,
+        qty: payload.current_stock,
+        purchaseRate: payload.purchase_rate
+      });
+
+      toast.success('Product added successfully');
+      setProducts([...products, newProduct]);
     }
-    try {
-      if (window.electronAPI) {
-        // SKU uniqueness check before update (exclude current id)
-        const skuExists = await window.electronAPI.checkSkuExists(productForm.sku, editingItem);
-        console.log(' sku edit :' + skuExists)
-        if (skuExists) {
-          setProductErrors({ ...errors, sku: 'SKU already exists' });
-          toast.error('SKU already exists');
-          return;
-        }
-        const payload = { id: editingItem, ...buildProductPayload(productForm) };
-        await window.electronAPI.updateItem(payload);
-        toast.success('Product updated successfully');
-        await loadAllData();
-      }
-      setEditingItem(null);
-      setProductForm(initialProductForm);
-      setShowProductForm(false);
-      setProductErrors({});
-    } catch (error) {
-      if (error?.message?.includes('SKU already exists')) {
-        setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+    setShowProductForm(false);
+    setProductForm(initialProductForm);
+    setProductErrors({});
+  } catch (error) {
+    if (error?.message?.includes('SKU already exists')) {
+      setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+      toast.error('SKU already exists');
+    } else {
+      toast.error('Error adding product');
+      console.error('Error adding product:', error);
+    }
+  }
+};
+
+const handleUpdateProduct = async () => {
+  const errors = validateProductForm(productForm);
+  if (Object.keys(errors).length) {
+    setProductErrors(errors);
+    return;
+  }
+  try {
+    if (window.electronAPI) {
+      const skuExists = await window.electronAPI.checkSkuExists(productForm.sku, editingItem);
+      if (skuExists) {
+        setProductErrors({ ...errors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
-      } else {
-        toast.error('Error updating product');
-        console.error('Error updating product:', error);
+        return;
       }
+      const payload = { id: editingItem, ...buildProductPayload(productForm) };
+      await window.electronAPI.updateItem(payload);
+
+      // --- Update closing stock after editing product ---
+      await window.electronAPI.updateClosingStock({
+        itemId: editingItem,
+        qty: payload.current_stock,
+        purchaseRate: payload.purchase_rate
+      });
+
+      toast.success('Product updated successfully');
+      await loadAllData();
     }
-  };
+    setEditingItem(null); 
+    setProductForm(initialProductForm);
+    setShowProductForm(false);
+    setProductErrors({});
+  } catch (error) {
+    if (error?.message?.includes('SKU already exists')) {
+      setProductErrors({ ...productErrors, sku: 'SKU already exists' });
+      toast.error('SKU already exists');
+    } else {
+      toast.error('Error updating product');
+      console.error('Error updating product:', error);
+    }
+  }
+};
 
   const handleDeleteProduct = async (id) => {
     setConfirmMessage('Are you sure you want to delete this product?');
@@ -576,13 +584,52 @@ const Admin = () => {
     setConfirmOpen(true);
   };
 
+  // Customer management
+  const handleAddCustomer = async () => {
+    const errors = validateCustomerForm(customerForm);
+    if (Object.keys(errors).length) {
+      setCustomerErrors(errors);
+      toast.error('Please fill all required fields');
+      return;
+    }
+    const newCustomer = await window.electronAPI.addCustomer(customerForm);
+    setCustomers([...customers, newCustomer]);
+    setShowCustomerForm(false);
+    setCustomerForm(initialCustomerForm);
+    setCustomerErrors({});
+    toast.success('Customer added');
+  };
+
+  const handleUpdateCustomer = async () => {
+    const errors = validateCustomerForm(customerForm);
+    if (Object.keys(errors).length) {
+      setCustomerErrors(errors);
+      toast.error('Please fill all required fields');
+      return;
+    }
+    await window.electronAPI.updateCustomer({ id: editingCustomer, ...customerForm });
+    setCustomers(customers.map(c => c.id === editingCustomer ? { ...customerForm, id: editingCustomer } : c));
+    setShowCustomerForm(false);
+    setEditingCustomer(null);
+    setCustomerForm(initialCustomerForm);
+    setCustomerErrors({});
+    toast.success('Customer updated');
+  };
+
+  const handleDeleteCustomer = async (id) => {
+    await window.electronAPI.deleteCustomer(id);
+    setCustomers(customers.filter(c => c.id !== id));
+    toast.success('Customer deleted');
+  };
+
   const tabs = [
     { id: 'products', name: 'Products', icon: Package },
     { id: 'suppliers', name: 'Suppliers', icon: Users },
     { id: 'categories', name: 'Categories', icon: Tag },
     { id: 'units', name: 'Units', icon: Tag },
     { id: 'gst', name: 'GST Rates', icon: Percent },
-    { id: 'salesman', name: 'Salesmen', icon: Users }
+    { id: 'salesman', name: 'Salesmen', icon: Users },
+    { id: 'customers', name: 'Customers', icon: Users } // NEW: Customers tab
   ];
 
   if (loading) {
@@ -698,12 +745,12 @@ const Admin = () => {
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          {/* <button
+                         {/* <button
                             onClick={() => handleDeleteProduct(product.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button> */}
+                          </button>*/}
                         </td>
                       </tr>
                     ))}
@@ -932,6 +979,70 @@ const Admin = () => {
                           </button>
                           <button
                             onClick={() => handleDeleteSalesman(salesman.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Customers Tab */}
+          {activeTab === 'customers' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold">Customer Management</h2>
+                <button
+                  onClick={() => {
+                    setCustomerForm(initialCustomerForm); // <-- Reset customer form
+                    setShowCustomerForm(true);
+                  }}
+                  className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Customer
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {customers.map((customer) => (
+                      <tr key={customer.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {customer.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {customer.contact}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {customer.address}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                          <button
+                            onClick={() => {
+                              setEditingCustomer(customer.id);
+                              setCustomerForm(customer);
+                            }}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomer(customer.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1183,12 +1294,12 @@ const Admin = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Current Stock</label>
                 <input
                   type="number"
-                  
+                  onWheel={e => e.target.blur()} 
                   value={productForm.current_stock}
-                  readOnly
+                  onChange={(e) => setProductForm({ ...productForm, current_stock: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   min={0}
-                  placeholder="0"
+                  placeholder="Defaults to 0"
                 />
               </div>
 
@@ -1534,6 +1645,71 @@ const Admin = () => {
                   setEditingSalesman(null);
                   setSalesmanForm({ name: '', contact_info: '', address: '', joining_date: '' });
                   setSalesmanErrors({});
+                }}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Form Modal */}
+      {(showCustomerForm || editingCustomer) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+            </h2>
+            <div className="space-y-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={customerForm.name}
+                  onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    customerErrors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {customerErrors.name && <p className="text-red-600 text-xs mt-1">{customerErrors.name}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                <input
+                  type="text"
+                  value={customerForm.contact}
+                  onChange={e => setCustomerForm({ ...customerForm, contact: e.target.value })}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                    customerErrors.contact ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {customerErrors.contact && <p className="text-red-600 text-xs mt-1">{customerErrors.contact}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <input
+                  type="text"
+                  value={customerForm.address}
+                  onChange={e => setCustomerForm({ ...customerForm, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={editingCustomer ? handleUpdateCustomer : handleAddCustomer}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+              >
+                {editingCustomer ? 'Update' : 'Add'} Customer
+              </button>
+              <button 
+                onClick={() => {
+                  setShowCustomerForm(false);
+                  setEditingCustomer(null);
+                  setCustomerForm(initialCustomerForm);
+                  setCustomerErrors({});
                 }}
                 className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg"
               >

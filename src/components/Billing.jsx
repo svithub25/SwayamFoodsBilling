@@ -20,11 +20,16 @@ const Billing = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
   const [selectedSalesman, setSelectedSalesman] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [customerDropdown, setCustomerDropdown] = useState(false);
+  const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
   const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
   const discountInputRef = useRef();
   const qtyInputRefs = useRef({});
   const searchInputRef = useRef();
   const billPdfRef = useRef();
+  const customerNameInputRef = useRef();
+  const customerContactInputRef = useRef();
 
   // Customer info
   const [customerInfo, setCustomerInfo] = useState({ name: '', contact: '', address: '', gstin: '' });
@@ -45,6 +50,14 @@ const Billing = () => {
       setSalesmen(list);
     }
     fetchSalesmen();
+  }, []);
+
+  useEffect(() => {
+    async function fetchCustomers() {
+      const list = await window.electronAPI.getCustomers();
+      setCustomers(list || []);
+    }
+    fetchCustomers();
   }, []);
 
   const loadItems = async () => {
@@ -323,6 +336,65 @@ const getFinalTotal = () => {
     }
   };
 
+  // --- Filter customers by name or contact ---
+  const filteredCustomers = customers.filter(c =>
+    (customerInfo.name && c.name?.toLowerCase().includes(customerInfo.name.toLowerCase())) ||
+    (customerInfo.contact && c.contact?.includes(customerInfo.contact))
+  );
+
+  // --- Handle dropdown selection ---
+  const handleCustomerSelect = (customer) => {
+    setCustomerInfo({
+      name: customer.name || '',
+      contact: customer.contact || '',
+      address: customer.address || '',
+      gstin: customer.gstin || ''
+    });
+    setCustomerDropdown(false);
+  };
+
+  // --- Handle Tab/Enter key for auto-fill ---
+const handleCustomerInputKeyDown = (e, field) => {
+  if (e.key === 'Delete') {
+    setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+    setCustomerDropdown(false);
+    setCustomerDropdownIndex(0);
+    return; 
+  }
+  if (filteredCustomers.length === 0) return;
+  if (e.key === 'ArrowDown') {
+    setCustomerDropdownIndex(i => (i + 1) % filteredCustomers.length);
+  } else if (e.key === 'ArrowUp') {
+    setCustomerDropdownIndex(i => (i - 1 + filteredCustomers.length) % filteredCustomers.length);
+  } else if (e.key === 'Tab' || e.key === 'Enter') {
+    e.preventDefault();
+    handleCustomerSelect(filteredCustomers[customerDropdownIndex]);
+    setCustomerDropdown(false);
+    setCustomerDropdownIndex(0);
+    // Focus next field
+    if (field === 'name') customerContactInputRef.current?.focus();
+    else if (field === 'contact') customerNameInputRef.current?.focus();
+  }
+};
+
+  // --- Add new customer if not found ---
+  const handleAddCustomerFromInput = async () => {
+    if (
+      customerInfo.name.trim().length > 0 &&
+      customerInfo.contact.trim().length === 10 &&
+      !customers.some(c => c.contact === customerInfo.contact)
+    ) {
+      const newCustomer = await window.electronAPI.addCustomer({
+        name: customerInfo.name,
+        contact: customerInfo.contact,
+        address: customerInfo.address,
+        gstin: customerInfo.gstin
+      });
+      setCustomers([...customers, newCustomer]);
+      toast.success('Customer added!');
+    }
+  };
+
   useEffect(() => {
     setCart(cart =>
       cart.map(cartItem => {
@@ -366,53 +438,100 @@ const getFinalTotal = () => {
               Customer Information
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              {/* Name with dropdown */}
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
                 <input
+                  ref={customerNameInputRef}
                   type="text"
                   value={customerInfo.name}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                  onChange={e => {
+                    setCustomerInfo({ ...customerInfo, name: e.target.value });
+                    setCustomerDropdown(true);
+                    setCustomerDropdownIndex(0);
+                  }}
+                  onFocus={() => setCustomerDropdown(true)}
+                  onBlur={() => setTimeout(() => setCustomerDropdown(false), 100)}
+                  onKeyDown={e => handleCustomerInputKeyDown(e, 'name')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Customer name"
-                  tabIndex={0}
+                  tabIndex={1}
+                  autoComplete="off"
                 />
+                {customerDropdown && filteredCustomers.length > 0 && (
+                  <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                    {filteredCustomers.map((customer, idx) => (
+                      <li
+                        key={customer.id}
+                        className={`px-3 py-2 cursor-pointer ${idx === customerDropdownIndex ? 'bg-blue-100' : ''}`}
+                        onMouseDown={() => handleCustomerSelect(customer)}
+                        tabIndex={-1}
+                      >
+                        {customer.name} <span className="text-xs text-gray-400">({customer.contact})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              <div>
+              {/* Contact with dropdown */}
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
-               <input
+                <input
+                  ref={customerContactInputRef}
                   type="number"
                   value={customerInfo.contact}
-                  onWheel={e => e.target.blur()} 
+                  onWheel={e => e.target.blur()}
                   onChange={e => {
-                    // Only allow up to 10 digits, remove non-digits
                     let val = e.target.value.replace(/\D/g, '').slice(0, 10);
                     setCustomerInfo({ ...customerInfo, contact: val });
+                    setCustomerDropdown(true);
+                    setCustomerDropdownIndex(0);
                   }}
+                  onFocus={() => setCustomerDropdown(true)}
+                  onBlur={() => setTimeout(() => setCustomerDropdown(false), 100)}
+                  onKeyDown={e => handleCustomerInputKeyDown(e, 'contact')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Phone number"
-                  tabIndex={0}
+                  tabIndex={2}
+                  autoComplete="off"
                 />
+                {customerDropdown && filteredCustomers.length > 0 && (
+                  <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                    {filteredCustomers.map((customer, idx) => (
+                      <li
+                        key={customer.id}
+                        className={`px-3 py-2 cursor-pointer ${idx === customerDropdownIndex ? 'bg-blue-100' : ''}`}
+                        onMouseDown={() => handleCustomerSelect(customer)}
+                        tabIndex={-1}
+                      >
+                        {customer.contact} <span className="text-xs text-gray-400">({customer.name})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+              {/* Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
                 <input
                   type="text"
                   value={customerInfo.address}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                  onChange={e => setCustomerInfo({ ...customerInfo, address: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Customer address"
-                  tabIndex={0}
+                  tabIndex={3}
                 />
               </div>
+              {/* GSTIN */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">GSTIN (Optional)</label>
                 <input
                   type="text"
                   value={customerInfo.gstin}
-                  onChange={(e) => setCustomerInfo({ ...customerInfo, gstin: e.target.value })}
+                  onChange={e => setCustomerInfo({ ...customerInfo, gstin: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="GST number"
-                  tabIndex={0}
+                  tabIndex={4} 
                 />
               </div>
             </div>

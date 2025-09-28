@@ -240,13 +240,13 @@ const PurchaseDetails = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-center">
+          {/* <div className="flex items-center">
             <BadgePercent className="w-5 h-5 text-gray-500 mr-2" />
             <div>
               <p className="text-sm text-gray-500">Overall Discount</p>
               <p className="font-semibold text-blue-700">{purchase.discount ? `${purchase.discount}%` : '0%'}</p>
             </div>
-          </div>
+          </div> */}
         </div>
 
     

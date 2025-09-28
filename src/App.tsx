@@ -59,11 +59,11 @@ const App: React.FC = () => {
   useHotkeys("ctrl+shift+a", () => navigate("/admin"), [navigate]);
   useHotkeys("ctrl+shift+o", () => navigate("/purchase-order"), [navigate]);
   useHotkeys("ctrl+shift+x", () => navigate("/analytics"), [navigate]);
-  useHotkeys("ctrl+t", () => {setShowShortcutHelp(true);
-   console.log("Shortcut Help Opened");  
-  }, [setShowShortcutHelp]);
+  // useHotkeys("ctrl+t", () => {setShowShortcutHelp(true);
+  //  console.log("Shortcut Help Opened");  
+  // }, [setShowShortcutHelp]);
  
-  useEffect(() => { 
+  useEffect(() => {  
     const savedUser = localStorage.getItem("user"); 
     if (savedUser) {
       setUser(JSON.parse(savedUser));

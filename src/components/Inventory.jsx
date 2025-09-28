@@ -12,11 +12,18 @@ const Inventory = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [closingStockTotal, setClosingStockTotal] = useState(0);
 
   useEffect(() => {
     loadInventory();
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      fetchClosingStockTotal();
+    }
+  }, [items]);
 
   const loadInventory = async () => {
     try {
@@ -32,18 +39,29 @@ const Inventory = () => {
   const loadCategories = async () => {
     try {
       const data = await window.electronAPI.getCategories();
-      setCategories(data);
+      setCategories(data); 
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error('Error loading categories:', error); 
     }
   }; 
 
-const filteredItems = items.filter(item =>
-  item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  item.category_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
-);
+  // Fetch and sum closing stock for all items
+  const fetchClosingStockTotal = async () => {
+    let total = 0;
+    for (const item of items) {
+      const closing = await window.electronAPI.getClosingStock(item.id);
+      if (closing && closing.closing_amount) {
+        total += Number(closing.closing_amount);
+      }
+    }
+    setClosingStockTotal(total);
+  };
 
+  const filteredItems = items.filter(item =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.category_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const lowStockItems = items.filter(item => item.current_stock <= item.minimum_stock);
 
@@ -66,7 +84,7 @@ const filteredItems = items.filter(item =>
       </div> 
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <Package className="w-8 h-8 text-blue-600" />
@@ -97,6 +115,19 @@ const filteredItems = items.filter(item =>
               </p>
             </div>
           </div> 
+        </div>
+
+        {/* Closing Stock Card */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <Package className="w-8 h-8 text-purple-600" />
+            <div className="ml-4">
+              <p className="text-sm text-gray-600">Closing Stock Value</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ₹{closingStockTotal.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
