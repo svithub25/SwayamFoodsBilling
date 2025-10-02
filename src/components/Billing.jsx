@@ -1,4 +1,4 @@
-import { Download, FileText, Plus,History, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User,SendHorizontal } from 'lucide-react';
+import { Download, FileText, Plus, History, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User, SendHorizontal } from 'lucide-react';
 import { useHotkeys } from "react-hotkeys-hook";
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -8,7 +8,7 @@ import jsPDF from 'jspdf';
 
 const Billing = () => {
   const [items, setItems] = useState([]);
-  const [cart, setCart] = useState([]); 
+  const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDropdown, setSearchDropdown] = useState(false);
@@ -64,7 +64,7 @@ const Billing = () => {
   const loadItems = async () => {
     try {
       const data = await window.electronAPI.getInventory();
-      console.log('Loaded items:', data); 
+      console.log('Loaded items:', data);
       setItems(data);
     } catch (error) {
       console.error('Error loading items:', error);
@@ -85,7 +85,7 @@ const Billing = () => {
   // --- Fast item search and add ---
   const filteredItems = items.filter(item =>
     (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
+      (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
     && item.current_stock > 0
   );
 
@@ -144,7 +144,7 @@ const Billing = () => {
         return newCart;
       });
     }
-  }; 
+  };
 
   // --- Update cart rates when checkboxes change ---
   useEffect(() => {
@@ -227,20 +227,20 @@ const Billing = () => {
   };
 
   // Rounding off calculation
-const getRoundingOff = () => {
-  const total = getSubtotal();
-  const discountAmount = (total * discount) / 100;
-  const net = total - discountAmount;
-  // Round to nearest integer
-  return +(Math.round(net) - net).toFixed(2);
-};
+  const getRoundingOff = () => {
+    const total = getSubtotal();
+    const discountAmount = (total * discount) / 100;
+    const net = total - discountAmount;
+    // Round to nearest integer
+    return +(Math.round(net) - net).toFixed(2);
+  };
 
-const getFinalTotal = () => {
-  const total = getSubtotal();
-  const discountAmount = (total * discount) / 100;
-  const net = total - discountAmount;
-  return Math.round(net);
-};
+  const getFinalTotal = () => {
+    const total = getSubtotal();
+    const discountAmount = (total * discount) / 100;
+    const net = total - discountAmount;
+    return Math.round(net);
+  };
 
   // --- Sale completion ---
   const completeSale = async (action = 'complete') => {
@@ -275,7 +275,7 @@ const getFinalTotal = () => {
         return {
           id: item.id,
           quantity: parseInt(item.quantity),
-          unit_price: item.unit_price, 
+          unit_price: item.unit_price,
           gst_percentage: item.gst_percentage,
           total_price: totalAmount,
           customer_rate: origItem?.customer_rate ?? item.unit_price,   // <-- Add customer_rate
@@ -294,87 +294,87 @@ const getFinalTotal = () => {
         total_amount: getFinalTotal(),
         rounding_off: getRoundingOff(),
         salesman_id: selectedSalesman || null,
-        sale_type: isSalesmanCustomer ? 'salesman' : 'customer' // <-- ADD THIS
+        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer') // <-- updated line
       };
       if (window.electronAPI) {
         await window.electronAPI.saveSale(saleData);
-        console.log('saleData:', saleData); 
+        console.log('saleData:', saleData);
       }
 
       // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
-     // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
-if (action === 'pdf') {
-  try {
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.position = 'fixed';
-    pdfContainer.style.left = '-9999px';
-    pdfContainer.style.top = '0';
-    pdfContainer.style.width = '210mm';
-    pdfContainer.style.zIndex = '-1';
-    document.body.appendChild(pdfContainer);
+      // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
+      if (action === 'pdf') {
+        try {
+          const pdfContainer = document.createElement('div');
+          pdfContainer.style.position = 'fixed';
+          pdfContainer.style.left = '-9999px';
+          pdfContainer.style.top = '0';
+          pdfContainer.style.width = '210mm';
+          pdfContainer.style.zIndex = '-1';
+          document.body.appendChild(pdfContainer);
 
-    import('react-dom/client').then(({ createRoot }) => {
-      const root = createRoot(pdfContainer);
-      root.render(
-        <BillPDF
-          billNumber={billNumber}
-          customer={customerInfo}
-          items={cart.map(item => ({
-            hsn_code: item.hsn_code,
-            sku: item.sku,
-            name: item.name,
-            quantity: parseInt(item.quantity) || 0,
-            unit_price: item.unit_price
-          }))}
-          discount={discount}
-          subtotal={getSubtotal()}
-          roundingOff={getRoundingOff()}
-          total={getFinalTotal()}
-        />
-      );
-      
-      setTimeout(async () => {
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4'
-        });
+          import('react-dom/client').then(({ createRoot }) => {
+            const root = createRoot(pdfContainer);
+            root.render(
+              <BillPDF
+                billNumber={billNumber}
+                customer={customerInfo}
+                items={cart.map(item => ({
+                  hsn_code: item.hsn_code,
+                  sku: item.sku,
+                  name: item.name,
+                  quantity: parseInt(item.quantity) || 0,
+                  unit_price: item.unit_price
+                }))}
+                discount={discount}
+                subtotal={getSubtotal()}
+                roundingOff={getRoundingOff()}
+                total={getFinalTotal()}
+              />
+            );
 
-        // Find all page divs with proper selector
-        const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
-        
-        for (let i = 0; i < pageElements.length; i++) {
-          if (i > 0) {
-            pdf.addPage();
-          }
-          
-          const canvas = await html2canvas(pageElements[i], { 
-            scale: 1.5,
-            useCORS: true,
-            allowTaint: true,
-            width: 794, // A4 width in pixels at 96 DPI
-            height: 1123, // A4 height in pixels at 96 DPI
-            backgroundColor: '#ffffff'
+            setTimeout(async () => {
+              const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+              });
+
+              // Find all page divs with proper selector
+              const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+
+              for (let i = 0; i < pageElements.length; i++) {
+                if (i > 0) {
+                  pdf.addPage();
+                }
+
+                const canvas = await html2canvas(pageElements[i], {
+                  scale: 1.5,
+                  useCORS: true,
+                  allowTaint: true,
+                  width: 794, // A4 width in pixels at 96 DPI
+                  height: 1123, // A4 height in pixels at 96 DPI
+                  backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                // Add image to fill the entire page
+                pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+              }
+
+              pdf.save(`Invoice_${billNumber}.pdf`);
+              root.unmount();
+              document.body.removeChild(pdfContainer);
+              toast.success('PDF generated and downloaded!');
+            }, 1000);
           });
-          
-          const imgData = canvas.toDataURL('image/png');
-          const pageWidth = pdf.internal.pageSize.getWidth();
-          const pageHeight = pdf.internal.pageSize.getHeight();
-          
-          // Add image to fill the entire page
-          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+        } catch (err) {
+          toast.error('Error generating PDF');
         }
-
-        pdf.save(`Invoice_${billNumber}.pdf`);
-        root.unmount();
-        document.body.removeChild(pdfContainer);
-        toast.success('PDF generated and downloaded!');
-      }, 1000);
-    });
-  } catch (err) {
-    toast.error('Error generating PDF');
-  }
-}
+      }
       // --- END PDF GENERATION ---
 
       // Now reset form
@@ -408,8 +408,8 @@ if (action === 'pdf') {
   const showPurchaseHistory = async (itemId) => {
     try {
       const history = await window.electronAPI.getItemPurchaseHistory(itemId);
-      console.log('Item Purchase History:', history); 
-      setItemHistory(history || []); 
+      console.log('Item Purchase History:', history);
+      setItemHistory(history || []);
       setShowItemHistory(itemId);
     } catch (error) {
       setItemHistory([]);
@@ -435,28 +435,28 @@ if (action === 'pdf') {
   };
 
   // --- Handle Tab/Enter key for auto-fill ---
-const handleCustomerInputKeyDown = (e, field) => {
-  if (e.key === 'Delete') {
-    setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
-    setCustomerDropdown(false);
-    setCustomerDropdownIndex(0);
-    return; 
-  }
-  if (filteredCustomers.length === 0) return;
-  if (e.key === 'ArrowDown') {
-    setCustomerDropdownIndex(i => (i + 1) % filteredCustomers.length);
-  } else if (e.key === 'ArrowUp') {
-    setCustomerDropdownIndex(i => (i - 1 + filteredCustomers.length) % filteredCustomers.length);
-  } else if (e.key === 'Tab' || e.key === 'Enter') {
-    e.preventDefault();
-    handleCustomerSelect(filteredCustomers[customerDropdownIndex]);
-    setCustomerDropdown(false);
-    setCustomerDropdownIndex(0);
-    // Focus next field
-    if (field === 'name') customerContactInputRef.current?.focus();
-    else if (field === 'contact') customerNameInputRef.current?.focus();
-  }
-};
+  const handleCustomerInputKeyDown = (e, field) => {
+    if (e.key === 'Delete') {
+      setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+      setCustomerDropdown(false);
+      setCustomerDropdownIndex(0);
+      return;
+    }
+    if (filteredCustomers.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      setCustomerDropdownIndex(i => (i + 1) % filteredCustomers.length);
+    } else if (e.key === 'ArrowUp') {
+      setCustomerDropdownIndex(i => (i - 1 + filteredCustomers.length) % filteredCustomers.length);
+    } else if (e.key === 'Tab' || e.key === 'Enter') {
+      e.preventDefault();
+      handleCustomerSelect(filteredCustomers[customerDropdownIndex]);
+      setCustomerDropdown(false);
+      setCustomerDropdownIndex(0);
+      // Focus next field
+      if (field === 'name') customerContactInputRef.current?.focus();
+      else if (field === 'contact') customerNameInputRef.current?.focus();
+    }
+  };
 
   // --- Add new customer if not found ---
   const handleAddCustomerFromInput = async () => {
@@ -612,37 +612,37 @@ const handleCustomerInputKeyDown = (e, field) => {
                   onChange={e => setCustomerInfo({ ...customerInfo, gstin: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="GST number"
-                  tabIndex={4} 
+                  tabIndex={4}
                 />
               </div>
             </div>
-            <div className="flex items-center mt-2 space-x-6">
-      <div className="flex items-center">
-      <input
-        type="checkbox"
-        checked={isSalesmanCustomer}
-        onChange={e => setIsSalesmanCustomer(e.target.checked)}
-        id="isSalesmanCustomer"
-        className="mr-2"
-        disabled={isOthers}
-      />
-      <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
-        Is Salesman
-      </label>
-    </div>
-    <div className="flex items-center">
-      <input
-        type="checkbox"
-        checked={isOthers}
-        onChange={e => setIsOthers(e.target.checked)}
-        id="isOthers"
-        className="mr-2"
-      />
-      <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
-        Others
-      </label>
-    </div>
-    </div>
+            <div className="flex items-center mt-6 space-x-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isSalesmanCustomer}
+                  onChange={e => setIsSalesmanCustomer(e.target.checked)}
+                  id="isSalesmanCustomer"
+                  className="mr-2 w-5 h-5"
+                  disabled={isOthers}
+                />
+                <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
+                  Is Salesman
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isOthers}
+                  onChange={e => setIsOthers(e.target.checked)}
+                  id="isOthers"
+                  className="mr-2 w-5 h-5"
+                />
+                <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
+                  Others
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Salesman Selection */}
@@ -724,13 +724,13 @@ const handleCustomerInputKeyDown = (e, field) => {
                       onClick={() => showPurchaseHistory(item.id)}
                       className="text-gray-400 hover:text-gray-600"
                     >
-                      <History className="w-4 h-4" /> 
+                      <History className="w-4 h-4" />
                     </button>
                   </div>
                   <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
                   {item.hsn_code && <p className="text-sm text-gray-600 mb-1">HSN: {item.hsn_code}</p>}
                   <p className="text-sm text-gray-600 mb-2">Stock: {item.current_stock} {item.unit}</p>
-                  <div className="flex items-center justify-between mb-3"> 
+                  <div className="flex items-center justify-between mb-3">
                     <span className="text-lg font-bold text-gray-900">₹{item.customer_rate}</span>
                   </div>
                   <button
@@ -777,7 +777,7 @@ const handleCustomerInputKeyDown = (e, field) => {
                         <input
                           ref={el => qtyInputRefs.current[item.id] = el}
                           type="number"
-                          onWheel={e => e.target.blur()} 
+                          onWheel={e => e.target.blur()}
                           value={item.quantity}
                           min={1}
                           max={item.current_stock}
@@ -809,7 +809,7 @@ const handleCustomerInputKeyDown = (e, field) => {
                   <input
                     ref={discountInputRef}
                     type="number"
-                    onWheel={e => e.target.blur()} 
+                    onWheel={e => e.target.blur()}
                     value={discount}
                     onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -820,7 +820,7 @@ const handleCustomerInputKeyDown = (e, field) => {
                       if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
                         e.preventDefault();
                         completeSale('save');
-                      } 
+                      }
                     }}
                   />
                 </div>
@@ -900,7 +900,7 @@ const handleCustomerInputKeyDown = (e, field) => {
               >
                 <span className="text-xl">×</span>
               </button>
-            </div> 
+            </div>
             {itemHistory.length > 0 ? (
               <div className="space-y-3">
                 {itemHistory.map((record, index) => (
@@ -931,27 +931,27 @@ const handleCustomerInputKeyDown = (e, field) => {
 
       {/* Hidden BillPDF for PDF generation */}
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-      {/* <div> */} 
+        {/* <div> */}
         <div ref={billPdfRef}>
-      <BillPDF
-      billNumber={billNumber} 
-      customer={customerInfo}
-      items={cart.map(item => ({
-        hsn_code: item.hsn_code,
-        sku: item.sku,
-        name: item.name,
-        quantity: parseInt(item.quantity) || 0,
-        unit_price: item.unit_price 
-      }))}
-      discount={discount}
-      subtotal={getSubtotal()}
-      roundingOff={getRoundingOff()}
-      total={getFinalTotal()}
-    />
+          <BillPDF
+            billNumber={billNumber}
+            customer={customerInfo}
+            items={cart.map(item => ({
+              hsn_code: item.hsn_code,
+              sku: item.sku,
+              name: item.name,
+              quantity: parseInt(item.quantity) || 0,
+              unit_price: item.unit_price
+            }))}
+            discount={discount}
+            subtotal={getSubtotal()}
+            roundingOff={getRoundingOff()}
+            total={getFinalTotal()}
+          />
         </div>
       </div>
     </div>
   );
 };
- 
+
 export default Billing; 

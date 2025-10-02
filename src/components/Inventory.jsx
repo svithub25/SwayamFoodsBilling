@@ -103,13 +103,13 @@ const Inventory = () => {
               <p className="text-2xl font-bold text-gray-900">{lowStockItems.length}</p>
             </div>
           </div>
-        </div>
-        
+        </div> 
+
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <Package className="w-8 h-8 text-green-600" />
             <div className="ml-4">
-              <p className="text-sm text-gray-600">Total Value (MRP)</p>
+              <p className="text-sm text-gray-600">Total Value</p>
               <p className="text-2xl font-bold text-gray-900">
                 ₹{items.reduce((sum, item) => sum + (item.current_stock * item.customer_rate), 0).toLocaleString()}
               </p>

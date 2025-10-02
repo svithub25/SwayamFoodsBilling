@@ -62,6 +62,10 @@ const SaleEdit = () => {
     items: []
   });
 
+  // --- New states for salesman/customer logic ---
+  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
+  const [isOthers, setIsOthers] = useState(false);
+
   useEffect(() => {
     loadSaleDetails();
     window.electronAPI.getInventory().then(setItems);
@@ -70,11 +74,10 @@ const SaleEdit = () => {
     // eslint-disable-next-line
   }, [id]);
 
-  const loadSaleDetails = async () => {
+  const loadSaleDetails = async () => { 
     setLoading(true);
     try {
       const result = await window.electronAPI.getSaleDetails(parseInt(id));
-      console.log(result)
       setSale(result); 
       setForm({
         bill_number: result.bill_number,
@@ -94,6 +97,10 @@ const SaleEdit = () => {
         }))
       });
       setSelectedSalesman(result.salesman_id || '');
+
+      // Reflect sale_type in checkboxes
+      setIsSalesmanCustomer(result.sale_type === 'salesman');
+      setIsOthers(result.sale_type === 'others');
     } catch (error) {
       toast.error('Error loading sale details');
     } finally {
@@ -102,7 +109,7 @@ const SaleEdit = () => {
   };
 
   // Item dropdown logic (for adding new items)
-  const [itemSearch, setItemSearch] = useState('');
+  const [itemSearch, setItemSearch] = useState(''); 
   const [showItemList, setShowItemList] = useState(false);
   const [itemDropdownIndex, setItemDropdownIndex] = useState(0);
   const itemInputRef = useRef();
@@ -133,6 +140,11 @@ const filteredItems = items.filter(i =>
       setItemSearch('');
       return;
     }
+    // Determine rate based on checkbox logic
+    let rate = item.customer_rate;
+    if (isOthers || isSalesmanCustomer) {
+      rate = item.salesman_rate;
+    }
     setForm(f => ({
       ...f,
       items: [
@@ -142,7 +154,7 @@ const filteredItems = items.filter(i =>
           name: item.name,
           hsn_code: item.hsn_code,
           quantity: '',
-          unit_price: item.mrp, // Use MRP as rate
+          unit_price: rate,
           total_price: 0
         }
       ]
@@ -193,6 +205,31 @@ const filteredItems = items.filter(i =>
   // Final total
   const getFinalAmount = () => Math.round(getAmountBeforeRounding());
 
+  // --- Update item rate logic when checkboxes change ---
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      items: f.items.map(item => {
+        const origItem = items.find(i => i.id === item.id);
+        const rate = isOthers
+          ? origItem?.salesman_rate ?? item.unit_price
+          : isSalesmanCustomer
+            ? origItem?.salesman_rate ?? item.unit_price
+            : origItem?.customer_rate ?? item.unit_price;
+        return { ...item, unit_price: rate, total_price: (parseFloat(item.quantity) || 0) * rate };
+      })
+    }));
+  }, [isSalesmanCustomer, isOthers, items]);
+
+  // --- Auto-select salesman to SELF when Others is checked ---
+  useEffect(() => {
+    if (isOthers) {
+      const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
+      if (selfSalesman) setSelectedSalesman(selfSalesman.id);
+      setIsSalesmanCustomer(false);
+    }
+  }, [isOthers, salesmen]);
+
   const handleSave = async () => {
     // Validate
     if (!form.bill_number || !form.sale_date || form.items.length === 0) {
@@ -215,10 +252,11 @@ const filteredItems = items.filter(i =>
     try {
       await window.electronAPI.updateSale(parseInt(id), {
         ...form,
-        items: validItems,
+        items: form.items,
         total_amount: getFinalAmount(),
         rounding_off: getRoundingOff(),
-        salesman_id: selectedSalesman || null // <-- add salesman_id
+        salesman_id: selectedSalesman || null,
+        sale_type: isSalesmanCustomer ? 'salesman' : 'customer'
       });
       toast.success('Sale updated successfully!');
       navigate('/sales-history');
@@ -325,6 +363,7 @@ const filteredItems = items.filter(i =>
                 value={selectedSalesman}
                 onChange={e => setSelectedSalesman(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isOthers}
               >
                 <option value="">Select Salesman</option>
                 {salesmen.map(s => (
@@ -332,6 +371,34 @@ const filteredItems = items.filter(i =>
                 ))}
               </select>
             </div>
+              {/* --- UI for checkboxes --- */}
+                   <div className="flex items-center mt-2 space-x-6">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isSalesmanCustomer}
+                onChange={e => setIsSalesmanCustomer(e.target.checked)}
+                id="isSalesmanCustomer"
+                className="mr-2 w-5 h-5 accent-blue-600"
+                disabled={isOthers}
+              />
+              <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
+                Is Salesman
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isOthers}
+                onChange={e => setIsOthers(e.target.checked)}
+                id="isOthers"
+                className="mr-2 w-5 h-5 accent-blue-600"
+              />
+              <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
+                Others
+              </label>
+            </div>
+          </div>
           </div>
 
           {/* Item Search */}
@@ -466,6 +533,8 @@ const filteredItems = items.filter(i =>
               Update Sale
             </button>
           </div>
+
+        
         </div>
       </div>
     </PinProtected>
