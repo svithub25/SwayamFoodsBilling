@@ -902,8 +902,9 @@ ipcMain.handle('get-purchase-full-details', async (event, purchaseId) => {
 
 ipcMain.handle('get-sale-details', async (event, saleId) => {
   const sale = db.prepare(`
-    SELECT s.*, COUNT(si.id) as item_count FROM sales s
+    SELECT s.*, sm.name as salesman_name, COUNT(si.id) as item_count FROM sales s
     LEFT JOIN sale_items si ON s.id = si.sale_id
+    LEFT OUTER JOIN salesman sm ON s.salesman_id = sm.id
     WHERE s.id = ?
     GROUP BY s.id
   `).get(saleId);
@@ -1547,7 +1548,8 @@ ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
       sale_date = ?, 
       discount = ?, 
       total_amount = ?,
-      rounding_off = ?
+      rounding_off = ?,
+      salesman_id = ?
     WHERE id = ?
   `).run(
     updatedSale.customer_name,
@@ -1557,7 +1559,8 @@ ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
     updatedSale.sale_date,
     updatedSale.discount,
     updatedSale.total_amount,
-    updatedSale.rounding_off, // <-- add this line
+    updatedSale.rounding_off,
+    updatedSale.salesman_id || null,  // <-- add this line
     saleId
   );
 

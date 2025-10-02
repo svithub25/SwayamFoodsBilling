@@ -84,6 +84,13 @@ const SaleDetails = () => {
               <p className="font-semibold">{new Date(sale.sale_date).toLocaleDateString()}</p>
             </div>
           </div>
+          <div className="flex items-center">
+            <User className="w-5 h-5 text-gray-500 mr-2" />
+            <div>
+              <p className="text-sm text-gray-500">Salesman</p>
+              <p className="font-semibold">{sale.salesman_name || sale.salesman || 'N/A'}</p>
+            </div>
+          </div> 
         </div>
 
         {sale.customer_address && (

@@ -52,6 +52,8 @@ const SalesHistory = () => {
   });
   const billPdfRef = useRef();
   const debounceTimeout = useRef();
+  const [deletePin, setDeletePin] = useState('');
+  const [showDeletePinModal, setShowDeletePinModal] = useState(false);
 
   useEffect(() => {
     // Load sales history
@@ -89,7 +91,7 @@ const SalesHistory = () => {
   );
 };
 
-  // Direct filter on type
+  // Direct filter on type 
       const fetchFiltered = async () => {
       setLoading(true);
       try {
@@ -176,13 +178,26 @@ const clearFilters = () => {
   };
 
   const handleDeleteSale = async (saleId) => {
-    const result = await window.electronAPI.deleteBill(saleId);
-    if (result.success) {
-      toast.success('Sale deleted!');
-      loadSalesHistory();
-      fetchFiltered(); 
+    setShowDeletePinModal(true);
+    setDeleteId(saleId);
+  };
+
+  const confirmDeleteWithPin = async () => {
+    const isValid = await window.electronAPI.verifyPin(deletePin);
+    if (isValid) {
+      const result = await window.electronAPI.deleteBill(deleteId);
+      if (result.success) {
+        toast.success('Sale deleted!');
+        loadSalesHistory();
+        fetchFiltered();
+      } else {
+        toast.error(result.message || 'Cannot delete sale.');
+      }
+      setShowDeletePinModal(false);
+      setDeleteId(null);
+      setDeletePin('');
     } else {
-      toast.error(result.message || 'Cannot delete sale.');
+      toast.error('Invalid PIN');
     }
   };
 
@@ -734,17 +749,55 @@ const clearFilters = () => {
                 </button>
                 <button
                   className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
-                  onClick={async () => {
-                    await handleDeleteSale(deleteId);
+                  onClick={() => {
+                    setShowDeletePinModal(true);
                     setConfirmDeleteOpen(false);
                   }}
                 >
-                  Delete
+                  Enter PIN & Delete
                 </button>
               </div>
             </div>
           </div>
         )}
+
+      {/* Delete PIN Modal */}
+      {showDeletePinModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Enter PIN to Delete Sale</h2>
+            <input
+              type="password"
+              value={deletePin}
+              onChange={e => setDeletePin(e.target.value)}
+              placeholder="Enter PIN"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 mb-4"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter') confirmDeleteWithPin();
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800"
+                onClick={() => {
+                  setShowDeletePinModal(false);
+                  setDeletePin('');
+                  setDeleteId(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDeleteWithPin}
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Enhanced Approve PIN Modal with Payment Verification */}
       {showApprovePinModal && approvalData && (

@@ -42,6 +42,10 @@ const SaleEdit = () => {
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // --- Salesmen state ---
+  const [salesmen, setSalesmen] = useState([]);
+  const [selectedSalesman, setSelectedSalesman] = useState('');
+
   // --- PIN protection state ---
 
 
@@ -59,18 +63,19 @@ const SaleEdit = () => {
   });
 
   useEffect(() => {
-    
-      loadSaleDetails();
-      window.electronAPI.getInventory().then(setItems);
- 
+    loadSaleDetails();
+    window.electronAPI.getInventory().then(setItems);
+    // Load salesmen
+    window.electronAPI.getSalesmen().then(list => setSalesmen(list));
     // eslint-disable-next-line
-  }, [id ]);
+  }, [id]);
 
   const loadSaleDetails = async () => {
     setLoading(true);
     try {
       const result = await window.electronAPI.getSaleDetails(parseInt(id));
-      setSale(result);
+      console.log(result)
+      setSale(result); 
       setForm({
         bill_number: result.bill_number,
         customer_name: result.customer_name || '',
@@ -88,6 +93,7 @@ const SaleEdit = () => {
           total_price: item.total_price
         }))
       });
+      setSelectedSalesman(result.salesman_id || '');
     } catch (error) {
       toast.error('Error loading sale details');
     } finally {
@@ -211,7 +217,8 @@ const filteredItems = items.filter(i =>
         ...form,
         items: validItems,
         total_amount: getFinalAmount(),
-        rounding_off: getRoundingOff()
+        rounding_off: getRoundingOff(),
+        salesman_id: selectedSalesman || null // <-- add salesman_id
       });
       toast.success('Sale updated successfully!');
       navigate('/sales-history');
@@ -232,221 +239,235 @@ const filteredItems = items.filter(i =>
   }
 
   return (
-     <PinProtected message="This module is protected and requires PIN verification to access." modulename='Sales Edit'>
-    <div className="p-6">
-      <ConfirmModal
-        open={confirmOpen}
-        message="Do you want to save this sale? This will affect the current inventory and can affect past reports."
-        onConfirm={() => {
-          setConfirmOpen(false);
-          handleSave();
-        }}
-        onCancel={() => setConfirmOpen(false)}
-      />
-      <div className="flex items-center mb-6">
-        <button
-          onClick={() => navigate('/sales-history')}
-          className="flex items-center text-blue-600 hover:text-blue-800 mr-4"
-        >
-          <ArrowLeft className="w-5 h-5 mr-1" />
-          Back to Sales
-        </button>
-        <h1 className="text-2xl font-bold text-gray-800">Edit Sale</h1>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bill Number</label>
-            <input
-              type="text"
-              value={form.bill_number}
-              onChange={e => setForm(f => ({ ...f, bill_number: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              disabled
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-            <input
-              type="date"
-              value={form.sale_date}
-              onChange={e => setForm(f => ({ ...f, sale_date: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
-            <input
-              type="text"
-              value={form.customer_name}
-              onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact</label>
-            <input
-              type="text"
-              value={form.customer_contact}
-              onChange={e => setForm(f => ({ ...f, customer_contact: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <input
-              type="text"
-              value={form.customer_address}
-              onChange={e => setForm(f => ({ ...f, customer_address: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
-            <input
-              type="text"
-              value={form.customer_gstin}
-              onChange={e => setForm(f => ({ ...f, customer_gstin: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
+    <PinProtected message="This module is protected and requires PIN verification to access." modulename='Sales Edit'>
+      <div className="p-6">
+        <ConfirmModal
+          open={confirmOpen}
+          message="Do you want to save this sale? This will affect the current inventory and can affect past reports."
+          onConfirm={() => {
+            setConfirmOpen(false);
+            handleSave();
+          }}
+          onCancel={() => setConfirmOpen(false)}
+        />
+        <div className="flex items-center mb-6">
+          <button
+            onClick={() => navigate('/sales-history')}
+            className="flex items-center text-blue-600 hover:text-blue-800 mr-4"
+          >
+            <ArrowLeft className="w-5 h-5 mr-1" />
+            Back to Sales
+          </button>
+          <h1 className="text-2xl font-bold text-gray-800">Edit Sale</h1>
         </div>
 
-        {/* Item Search */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Add Item</label>
-          <div className="relative">
-            <input
-              ref={itemInputRef}
-              type="text"
-              value={itemSearch}
-              onChange={e => {
-                setItemSearch(e.target.value);
-                setShowItemList(true);
-                setItemDropdownIndex(0);
-              }}
-              onFocus={() => setShowItemList(true)}
-              onBlur={() => setTimeout(() => setShowItemList(false), 100)}
-              onKeyDown={handleItemInputKeyDown}
-              placeholder="Type to search item"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              autoComplete="off"
-            />
-            {showItemList && filteredItems.length > 0 && (
-              <ul className="absolute z-10 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
-                {filteredItems.map((itm, idx) => (
-                  <li
-                    key={itm.id}
-                    className={`px-3 py-2 cursor-pointer ${idx === itemDropdownIndex ? 'bg-blue-100' : ''}`}
-                    onMouseDown={() => addItemToSale(itm)}
-                    tabIndex={-1}
-                  >
-                    {itm.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Items Table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Item</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">HSN Code</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Quantity</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Rate</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.items.map((item, idx) => {
-                // Only allow changing quantity, not rate
-                return (
-                  <tr key={idx} className="border-b">
-                    <td className="px-4 py-2">{item.name}</td>
-                    <td className="px-4 py-2">{item.hsn_code || 'N/A'}</td>
-                    <td className="px-4 py-2">
-                      <input
-                        id={`qty-input-${idx}`}
-                        type="number"
-                        onWheel={e => e.target.blur()}
-                        value={item.quantity}
-                        min={1}
-                        onChange={e => updateSaleItem(idx, 'quantity', e.target.value)}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded"
-                      />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        disabled
-                        className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed"
-                      />
-                    </td>
-                    <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={() => removeSaleItem(idx)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Discount and Totals */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-4 border-t border-gray-200 gap-4">
-          <div className="flex flex-col items-end space-y-1 order-1 md:order-2 w-full md:w-auto">
-            <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">Subtotal:</span>
-              <span>₹{getSubtotal().toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">Discount (%):</span>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bill Number</label>
               <input
-                type="number"
-                onWheel={e => e.target.blur()}
-                value={form.discount}
-                min={0}
-                max={100}
-                onChange={e => setForm(f => ({ ...f, discount: e.target.value }))}
-                className="w-20 px-2 py-1 border border-gray-300 rounded"
+                type="text"
+                value={form.bill_number}
+                onChange={e => setForm(f => ({ ...f, bill_number: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                disabled
               />
             </div>
-            <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">Amount Before Rounding:</span>
-              <span>₹{getAmountBeforeRounding().toFixed(2)}</span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={form.sale_date}
+                onChange={e => setForm(f => ({ ...f, sale_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
             </div>
-            <div className="flex justify-between w-full md:w-auto">
-              <span className="font-medium text-gray-700 mr-2">Rounding Off:</span>
-              <span>{getRoundingOff() > 0 ? '+' : '-'}₹{Math.abs(getRoundingOff()).toFixed(2)}</span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
+              <input
+                type="text"
+                value={form.customer_name}
+                onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
             </div>
-            <div className="flex justify-between w-full md:w-auto text-lg font-semibold border-t border-gray-200 pt-2">
-              <span>Final Amount:</span>
-              <span>₹{getFinalAmount().toLocaleString()}</span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contact</label>
+              <input
+                type="text"
+                value={form.customer_contact}
+                onChange={e => setForm(f => ({ ...f, customer_contact: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <input
+                type="text"
+                value={form.customer_address}
+                onChange={e => setForm(f => ({ ...f, customer_address: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
+              <input
+                type="text"
+                value={form.customer_gstin}
+                onChange={e => setForm(f => ({ ...f, customer_gstin: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            {/* Salesman Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Salesman</label>
+              <select
+                value={selectedSalesman}
+                onChange={e => setSelectedSalesman(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Salesman</option>
+                {salesmen.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             </div>
           </div>
-          <button
-            onClick={() => setConfirmOpen(true)}
-            className="flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors order-2 md:order-1"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Update Sale
-          </button>
+
+          {/* Item Search */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Add Item</label>
+            <div className="relative">
+              <input
+                ref={itemInputRef}
+                type="text"
+                value={itemSearch}
+                onChange={e => {
+                  setItemSearch(e.target.value);
+                  setShowItemList(true);
+                  setItemDropdownIndex(0);
+                }}
+                onFocus={() => setShowItemList(true)}
+                onBlur={() => setTimeout(() => setShowItemList(false), 100)}
+                onKeyDown={handleItemInputKeyDown}
+                placeholder="Type to search item"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                autoComplete="off"
+              />
+              {showItemList && filteredItems.length > 0 && (
+                <ul className="absolute z-10 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                  {filteredItems.map((itm, idx) => (
+                    <li
+                      key={itm.id}
+                      className={`px-3 py-2 cursor-pointer ${idx === itemDropdownIndex ? 'bg-blue-100' : ''}`}
+                      onMouseDown={() => addItemToSale(itm)}
+                      tabIndex={-1}
+                    >
+                      {itm.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-auto">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Item</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">HSN Code</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Quantity</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Rate</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total</th>
+                  <th className="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.items.map((item, idx) => {
+                  // Only allow changing quantity, not rate
+                  return (
+                    <tr key={idx} className="border-b">
+                      <td className="px-4 py-2">{item.name}</td>
+                      <td className="px-4 py-2">{item.hsn_code || 'N/A'}</td>
+                      <td className="px-4 py-2">
+                        <input
+                          id={`qty-input-${idx}`}
+                          type="number"
+                          onWheel={e => e.target.blur()}
+                          value={item.quantity}
+                          min={1}
+                          onChange={e => updateSaleItem(idx, 'quantity', e.target.value)}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded"
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          disabled
+                          className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
+                      <td className="px-4 py-2">
+                        <button
+                          onClick={() => removeSaleItem(idx)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Discount and Totals */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-4 border-t border-gray-200 gap-4">
+            <div className="flex flex-col items-end space-y-1 order-1 md:order-2 w-full md:w-auto">
+              <div className="flex justify-between w-full md:w-auto">
+                <span className="font-medium text-gray-700 mr-2">Subtotal:</span>
+                <span>₹{getSubtotal().toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between w-full md:w-auto">
+                <span className="font-medium text-gray-700 mr-2">Discount (%):</span>
+                <input
+                  type="number"
+                  onWheel={e => e.target.blur()}
+                  value={form.discount}
+                  min={0}
+                  max={100}
+                  onChange={e => setForm(f => ({ ...f, discount: e.target.value }))}
+                  className="w-20 px-2 py-1 border border-gray-300 rounded"
+                />
+              </div>
+              <div className="flex justify-between w-full md:w-auto">
+                <span className="font-medium text-gray-700 mr-2">Amount Before Rounding:</span>
+                <span>₹{getAmountBeforeRounding().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between w-full md:w-auto">
+                <span className="font-medium text-gray-700 mr-2">Rounding Off:</span>
+                <span>{getRoundingOff() > 0 ? '+' : '-'}₹{Math.abs(getRoundingOff()).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between w-full md:w-auto text-lg font-semibold border-t border-gray-200 pt-2">
+                <span>Final Amount:</span>
+                <span>₹{getFinalAmount().toLocaleString()}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setConfirmOpen(true)}
+              className="flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors order-2 md:order-1"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Update Sale
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     </PinProtected>
   );
 };
