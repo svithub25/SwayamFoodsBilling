@@ -9,7 +9,8 @@ import {
   Package,
   Eye,
   RefreshCw,
-  Trash2
+  Trash2,
+  Minus 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -72,7 +73,7 @@ const SalesHistory = () => {
     fetchInventory();
 
     // Load salesmen list
-    async function fetchSalesmen() {
+    async function fetchSalesmen() { 
       const list = await window.electronAPI.getSalesmen();
       setSalesmen(list);
     }
@@ -146,7 +147,8 @@ const SalesHistory = () => {
         return parseInt(parts[parts.length - 1], 10) || 0;
       };
       return getBillNum(b.bill_number) - getBillNum(a.bill_number);
-    }); 
+    });  
+    console.log(data);
       setSales(data);
     } catch (error) {
       console.error('Error loading sales history:', error);
@@ -601,7 +603,7 @@ const clearFilters = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {sale.customer_name || 'Counter Sale'}
+                        {sale.sale_type === "salesman" ? sale.salesman: (sale.customer_name || ' ')} 
                       </div>
                       {sale.customer_contact && (
                         <div className="text-sm text-gray-500">{sale.customer_contact}</div>
@@ -615,7 +617,8 @@ const clearFilters = () => {
                     {sale.item_count} items
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {sale.salesman || 'N/A'}
+                   
+                     {sale.sale_type === "salesman" ? <Minus />: sale.salesman}  
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ₹{sale.total_amount.toLocaleString()}

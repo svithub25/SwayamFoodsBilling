@@ -19,7 +19,7 @@ function Invoice({ billNumber, customer, items, discount = 0, subtotal = 0, tota
           />
           <div>
             <h1 className="text-3xl font-bold text-[hsl(217_19%_35%)] tracking-tight">
-              Books & Stationary 
+              Foods 
             </h1>
             {/* <p className="text-[hsl(215.4_16.3%_46.9%)] text-base mt-1">
               Professional Business Solutions

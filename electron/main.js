@@ -461,7 +461,7 @@ ipcMain.handle('get-dashboard-data', async () => {
     `).get();
     const totalItems = db.prepare('SELECT COUNT(*) as count FROM items where (status_code = 0 OR status_code IS NULL)').get();
     const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock <= minimum_stock and (status_code = 0 OR status_code IS NULL)').get();
-    const totalInventoryValue = db.prepare('SELECT COALESCE(SUM(current_stock * mrp), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)').get();
+    const totalInventoryValue = db.prepare('SELECT COALESCE(SUM(current_stock * customer_rate), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)').get();
     const recentSales = db.prepare(`
       SELECT DATE(sale_date) as date, SUM(total_amount) as amount 
       FROM sales 
@@ -757,7 +757,7 @@ ipcMain.handle('generate-bill-number', async () => {
   let nextNumber = 1;
   if (lastBill && lastBill.bill_number) {
     // Extract the numeric part from the bill number
-    const match = lastBill.bill_number.match(/SH\/\d{2}-\d{2}\/(\d+)/);
+    const match = lastBill.bill_number.match(/SF\/\d{2}-\d{2}\/(\d+)/);
     if (match && match[1]) {
       nextNumber = parseInt(match[1], 10) + 1;
     }

@@ -279,8 +279,8 @@ const getFinalTotal = () => {
           const imgData = canvas.toDataURL("image/png");
           const pdf = new jsPDF({ 
             orientation: "portrait",
-            unit: "mm", 
-            format: "a4",
+            unit: "mm",  
+            format: "a4", 
           }); 
           const pageWidth = pdf.internal.pageSize.getWidth();
           const imgProps = pdf.getImageProperties(imgData);
@@ -289,7 +289,7 @@ const getFinalTotal = () => {
   
           pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
           pdf.save(`Invoice_${billNumber}.pdf`);
-          toast.success('PDF generated and downloaded!');
+          toast.success('PDF generated and downloaded!'); 
         } catch (err) {
           toast.error('Error generating PDF');
         }
@@ -833,8 +833,8 @@ const handleCustomerInputKeyDown = (e, field) => {
       )}
 
       {/* Hidden BillPDF for PDF generation */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-      {/* <div> */}
+      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
+      <div>
         <div ref={billPdfRef}>
       <BillPDF
       billNumber={billNumber} 

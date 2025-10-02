@@ -111,7 +111,7 @@ const Inventory = () => {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Total Value (MRP)</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₹{items.reduce((sum, item) => sum + (item.current_stock * item.mrp), 0).toLocaleString()}
+                ₹{items.reduce((sum, item) => sum + (item.current_stock * item.customer_rate), 0).toLocaleString()}
               </p>
             </div>
           </div> 

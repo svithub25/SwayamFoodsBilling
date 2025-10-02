@@ -123,16 +123,16 @@ const Admin = () => {
     if (isEmpty(form.unit)) errors.unit = 'Unit is required';
     if (isEmpty(form.category_id)) errors.category_id = 'Category is required';
 
-    const mrp = parseFloat(form.mrp);
-    if (isNaN(mrp) || mrp <= 0) errors.mrp = 'MRP must be greater than 0';
+    // const mrp = parseFloat(form.mrp);
+    // if (isNaN(mrp) || mrp <= 0) errors.mrp = 'MRP must be greater than 0';
 
     const pr = parseFloat(form.purchase_rate);
     if (isNaN(pr) || pr <= 0) errors.purchase_rate = 'Purchase rate must be greater than 0';
 
-    const sr = parseFloat(form.sale_rate);
-    if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
+    // const sr = parseFloat(form.sale_rate);
+    // if (isNaN(sr) || sr <= 0) errors.sale_rate = 'Sale rate must be greater than 0';
 
-    const cr = parseFloat(form.customer_rate);
+    const cr = parseFloat(form.customer_rate); 
     if (isNaN(cr) || cr < 0) errors.customer_rate = 'Customer rate must be 0 or more';
 
     const smr = parseFloat(form.salesman_rate);

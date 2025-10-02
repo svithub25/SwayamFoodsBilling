@@ -28,7 +28,7 @@ function PurchasePDF({
           />
           <div>
             <h1 className="text-3xl font-bold text-[hsl(217_19%_35%)] tracking-tight">
-              Books & Stationary
+              Foods
             </h1>
           </div>
         </div>
