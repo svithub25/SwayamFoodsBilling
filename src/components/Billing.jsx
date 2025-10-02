@@ -24,6 +24,7 @@ const Billing = () => {
   const [customerDropdown, setCustomerDropdown] = useState(false);
   const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
   const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
+  const [isOthers, setIsOthers] = useState(false);
   const discountInputRef = useRef();
   const qtyInputRefs = useRef({});
   const searchInputRef = useRef();
@@ -105,7 +106,12 @@ const Billing = () => {
 
   // --- Add to cart with empty quantity ---
   const addToCart = (item) => {
-    const rate = isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
+    // Use salesman_rate if Others is checked, else normal logic
+    const rate = isOthers
+      ? item.salesman_rate
+      : isSalesmanCustomer
+        ? item.salesman_rate
+        : item.customer_rate;
     const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
     if (existingIndex !== -1) {
       setCart(cart.map((cartItem, idx) =>
@@ -139,6 +145,32 @@ const Billing = () => {
       });
     }
   }; 
+
+  // --- Update cart rates when checkboxes change ---
+  useEffect(() => {
+    setCart(cart =>
+      cart.map(cartItem => {
+        const item = items.find(i => i.id === cartItem.id);
+        if (!item) return cartItem;
+        const rate = isOthers
+          ? item.salesman_rate
+          : isSalesmanCustomer
+            ? item.salesman_rate
+            : item.customer_rate;
+        return { ...cartItem, unit_price: rate };
+      })
+    );
+    // eslint-disable-next-line
+  }, [isSalesmanCustomer, isOthers]);
+
+  // --- Auto-select salesman to SELF when Others is checked ---
+  useEffect(() => {
+    if (isOthers) {
+      const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
+      if (selfSalesman) setSelectedSalesman(selfSalesman.id);
+      setIsSalesmanCustomer(false);
+    }
+  }, [isOthers, salesmen]);
 
   // --- Cart keyboard controls ---
   const handleCartKeyDown = (e, idx, itemId) => {
@@ -535,17 +567,32 @@ const handleCustomerInputKeyDown = (e, field) => {
                 />
               </div>
             </div>
-            <div className="flex items-center mt-2">
+            <div className="flex items-center mt-2 space-x-6">
+      <div className="flex items-center">
       <input
         type="checkbox"
         checked={isSalesmanCustomer}
         onChange={e => setIsSalesmanCustomer(e.target.checked)}
         id="isSalesmanCustomer"
         className="mr-2"
+        disabled={isOthers}
       />
       <label htmlFor="isSalesmanCustomer" className="text-sm font-medium text-gray-700">
         Is Salesman
       </label>
+    </div>
+    <div className="flex items-center">
+      <input
+        type="checkbox"
+        checked={isOthers}
+        onChange={e => setIsOthers(e.target.checked)}
+        id="isOthers"
+        className="mr-2"
+      />
+      <label htmlFor="isOthers" className="text-sm font-medium text-gray-700">
+        Others
+      </label>
+    </div>
     </div>
           </div>
 
@@ -562,6 +609,7 @@ const handleCustomerInputKeyDown = (e, field) => {
                   value={selectedSalesman}
                   onChange={e => setSelectedSalesman(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isOthers}
                 >
                   <option value="">Select Salesman</option>
                   {salesmen.map(s => (
@@ -833,8 +881,8 @@ const handleCustomerInputKeyDown = (e, field) => {
       )}
 
       {/* Hidden BillPDF for PDF generation */}
-      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
-      <div>
+      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+      {/* <div> */} 
         <div ref={billPdfRef}>
       <BillPDF
       billNumber={billNumber} 
@@ -857,4 +905,4 @@ const handleCustomerInputKeyDown = (e, field) => {
   );
 };
  
-export default Billing;
+export default Billing; 

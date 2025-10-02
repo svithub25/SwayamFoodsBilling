@@ -2448,7 +2448,7 @@ ipcMain.handle('get-Salesman-Commission', async () => {
     let totalCommission = 0;
     const itemCommissions = items.map(item => {
       // Use rates from sale_items table
-      const commission = (item.customer_rate - item.salesman_rate) * item.quantity;
+      const commission = (item.unit_price - item.salesman_rate) * item.quantity;
       totalCommission += commission;
       return {
         item_name: item.item_name,
