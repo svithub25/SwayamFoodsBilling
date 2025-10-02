@@ -1,11 +1,11 @@
 import React from "react";
 import companyLogo from "../Assets/logo.png";
-
-const ITEMS_PER_PAGE = 10;
+ 
+const ITEMS_PER_PAGE = 12;
 
 function PurchaseOrderPdf({ 
   billNumber, 
-  customer, 
+  customer,  
   items, 
   discount = 0, 
   subtotal = 0, 
@@ -18,27 +18,29 @@ function PurchaseOrderPdf({
   }
 
   const Header = () => (
-    <div className="flex items-center justify-between border-b border-[hsl(220_13%_91%)] pb-6 mb-8">
+    <div className="flex items-center   border-b border-[hsl(220_13%_91%)] pb-6 mb-8">
       <div className="flex items-center gap-8">
         <img
           src={companyLogo}
           alt="Company Logo"
           className="w-45 h-32 object-contain"
         />
-        <div>
+        {/* <div>
           <h1 className="text-2xl font-bold text-[hsl(217_19%_35%)]">
-            Books & Stationary
+            Swayam
           </h1>
-        </div>
+        </div> */}
       </div>
-      <div className="text-right space-y-1">
-        <h2 className="text-xl font-bold text-[hsl(214_84%_56%)]">PURCHASE ORDER</h2>
-        <div className="text-xs text-[hsl(215.4_16.3%_46.9%)] space-y-1">
-          <p>Panchaganga Hospital Building</p>
-          <p>Shukrawar Peth</p>
-          <p>Kolhapur</p>
+      <div className="text-left ml-12 space-y-1">
+      
+          <h2 className="text-2xl font-bold text-[hsl(214_84%_56%)]">INVOICE</h2>
+          <div className="text-sm text-[hsl(215.4_16.3%_46.9%)] space-y-1">
+            <p>Office Add. : 1815, D Ward, Shukrawar Peth, kadre Galli, near Piwla wada, Kolhapur</p>
+            <p>Shop Add. : Tele Galli, Sukrawar Peth, Kolhapur</p>
+            {/* <p>Kolhapur</p> */}
+            <p>Phone: 9371446315</p>
+          </div>
         </div>
-      </div>
     </div>
   );
 
@@ -140,11 +142,13 @@ function PurchaseOrderPdf({
           This is a computer-generated order and does not require signature.
         </p>
         <div className="flex justify-center space-x-4 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
-          <span>Email: harshank@gmail.com</span>
-          <span>•</span>
-          <span>Phone: 9923110805</span>
-          <span>•</span>
-          <span>Web: www.harshank.com</span>
+          <span>Email: swayamkolhapur@gmail.com</span>
+            <span>•</span>
+            <span>Phone: 9371446315</span>
+            <span>•</span> 
+            <span>Facebook : स्वयंम् </span>
+            <span>•</span>
+            <span>Instagram : swayamkolhapur </span>
         </div>
       </div>
     </div>
