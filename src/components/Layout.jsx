@@ -19,6 +19,7 @@ MessageSquareShare,
   X,
   User
 } from 'lucide-react';
+import svi from '../Assets/SVILogo.png'
 
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';

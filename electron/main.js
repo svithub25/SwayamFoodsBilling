@@ -458,6 +458,7 @@ ipcMain.handle('get-dashboard-data', async () => {
       SELECT COALESCE(SUM(total_amount), 0) as total 
       FROM sales  
       WHERE sale_date >= date('now', '-30 days')
+      and (status_code = 0 OR status_code IS NULL)
     `).get();
     const totalItems = db.prepare('SELECT COUNT(*) as count FROM items where (status_code = 0 OR status_code IS NULL)').get();
     const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock <= minimum_stock and (status_code = 0 OR status_code IS NULL)').get();

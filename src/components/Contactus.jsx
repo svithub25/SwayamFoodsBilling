@@ -101,15 +101,16 @@ const Contactus = () => {
                       <p className="flex items-center">
                         <span className="text-sm text-gray-500 w-16">Main:</span>
                         <span className="font-medium">8552872020</span>
-                      </p>
-                      {/* <p className="flex items-center">
-                        <span className="text-sm text-gray-500 w-16">Fax:</span>
-                        <span className="font-medium">(555) 123-4568</span>
+                      
                       </p>
                       <p className="flex items-center">
-                        <span className="text-sm text-gray-500 w-16">Support:</span>
-                        <span className="font-medium">(555) 123-4569</span>
-                      </p> */}
+                        <span className="text-sm text-gray-500 w-16">Alternate:</span>
+                        <span className="font-medium">9373893048</span>
+                      </p>
+                      <p className="flex items-center">
+                        <span className="text-sm text-gray-500 w-16">Alternate:</span>
+                        <span className="font-medium">9119587288</span>
+                      </p>
                     </div>
                   </div>
                 </div>
