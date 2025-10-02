@@ -324,6 +324,8 @@ const getFilteredItems = (search) =>
 
     // --- NEW: Check if stock will go negative ---
     const check = await window.electronAPI.checkPurchaseEditStock(id, itemsWithGST);
+    console.log(id , itemsWithGST)
+    console.log(check) 
     if (!check.ok) {
       toast.error(check.message || 'Stock will go negative for one or more items.');
       return;

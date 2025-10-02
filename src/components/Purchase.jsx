@@ -672,89 +672,102 @@ const getRoundingOff = () => {
 };
 const getFinalTotal = () => Math.round(totalWithGst);
  
-  const handleReprintPurchase = async (purchaseId) => {
-    try {
-      // Fetch purchase details from backend
-      const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchaseId);
-      console.log('purchaseDetails:', purchaseDetails);
+ const handleReprintPurchase = async (purchaseId) => {
+  try {
+    const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchaseId);
+    console.log('purchaseDetails:', purchaseDetails);
 
-      // Defensive mapping for supplier from purchaseDetails.purchase
-      const supplier = {
-        name: purchaseDetails.purchase.supplier_name || "",
-        address: purchaseDetails.purchase.supplier_address || "",
-        gstin: purchaseDetails.purchase.supplier_gstin || "",
-        contact: purchaseDetails.purchase.supplier_contact || ""
-      };
+    const supplier = {
+      name: purchaseDetails.purchase.supplier_name || "",
+      address: purchaseDetails.purchase.supplier_address || "",
+      gstin: purchaseDetails.purchase.supplier_gstin || "",
+      contact: purchaseDetails.purchase.supplier_contact || ""
+    };
 
-      // Defensive mapping for items from purchaseDetails.items
-      const items = (purchaseDetails.items || []).map(item => ({
-        hsn_code: item.hsn_code || "",
-        sku: item.sku || "",
-        name: item.item_name || "",
-        quantity: item.quantity || 0,
-        unit_price: item.unit_price || 0,
-        gst_percentage: item.gst_percentage || 0,
-        total_price: item.total_price || 0
-      }));
+    const items = (purchaseDetails.items || []).map(item => ({
+      hsn_code: item.hsn_code || "",
+      sku: item.sku || "",
+      name: item.item_name || "",
+      quantity: item.quantity || 0,
+      unit_price: item.unit_price || 0,
+      gst_percentage: item.gst_percentage || 0,
+      total_price: item.total_price || 0
+    }));
 
-      // Use purchaseDetails.purchase for all purchase fields
-      const purchaseNumber = purchaseDetails.purchase.id || purchaseDetails.purchase.invoice_number || "";
-      const invoiceNumber = purchaseDetails.purchase.invoice_number || "";
-      const purchaseDate = purchaseDetails.purchase.purchase_date
-        ? new Date(purchaseDetails.purchase.purchase_date).toLocaleDateString()
-        : "";
+    const purchaseNumber = purchaseDetails.purchase.id || "";
+    const invoiceNumber = purchaseDetails.purchase.invoice_number || "";
+    const purchaseDate = purchaseDetails.purchase.purchase_date
+      ? new Date(purchaseDetails.purchase.purchase_date).toLocaleDateString()
+      : "";
+    const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
-      // Calculate subtotal if not provided
-      const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'fixed';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '210mm';
+    pdfContainer.style.zIndex = '-1';
+    document.body.appendChild(pdfContainer);
 
-      // Create a hidden container for rendering the PDF
-      const pdfContainer = document.createElement('div');
-      pdfContainer.style.position = 'fixed';
-      pdfContainer.style.left = '-9999px';
-      pdfContainer.style.top = '0';
-      pdfContainer.style.width = '800px';
-      pdfContainer.style.zIndex = '-1';
-      document.body.appendChild(pdfContainer);
+    import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(pdfContainer);
+      root.render(
+        <PurchasePDF
+          purchaseNumber={purchaseNumber}
+          invoiceNumber={invoiceNumber}
+          purchaseDate={purchaseDate}
+          supplier={supplier}
+          items={items}
+          discount={purchaseDetails.purchase.discount || 0}
+          subtotal={subtotal}
+          roundingOff={purchaseDetails.purchase.rounding_off || 0}
+          total={purchaseDetails.purchase.total_amount || subtotal}
+        />
+      );
+      
+      setTimeout(async () => {
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
 
-      // Render PurchasePDF
-      import('react-dom/client').then(({ createRoot }) => {
-        const root = createRoot(pdfContainer);
-        root.render(
-          <PurchasePDF
-            purchaseNumber={purchaseNumber}
-            invoiceNumber={invoiceNumber}
-            purchaseDate={purchaseDate}
-            supplier={supplier}
-            items={items}
-            discount={purchaseDetails.purchase.discount || 0}
-            subtotal={subtotal}
-            roundingOff={purchaseDetails.purchase.rounding_off || 0}
-            total={purchaseDetails.purchase.total_amount || subtotal}
-          />
-        );
-        setTimeout(async () => {
-          const canvas = await html2canvas(pdfContainer, { scale: 2 });
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
+        // Find all page divs with proper selector
+        const pageElements = pdfContainer.querySelectorAll('#purchase-pdf > div');
+        
+        for (let i = 0; i < pageElements.length; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          const canvas = await html2canvas(pageElements[i], { 
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            width: 794, // A4 width in pixels at 96 DPI
+            height: 1123, // A4 height in pixels at 96 DPI
+            backgroundColor: '#ffffff'
           });
+          
+          const imgData = canvas.toDataURL('image/png');
           const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfWidth = pageWidth;
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`Purchase_${invoiceNumber || purchaseNumber || purchaseId}.pdf`);
-          root.unmount();
-          document.body.removeChild(pdfContainer);
-          toast.success('PDF generated!');
-        }, 300);
-      });
-    } catch (error) {
-      toast.error('Error generating PDF');
-    }
-  };
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          
+          // Add image to fill the entire page
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+        }
+
+        pdf.save(`Purchase_${invoiceNumber || purchaseNumber || purchaseId}.pdf`);
+        root.unmount();
+        document.body.removeChild(pdfContainer);
+        toast.success('PDF generated!');
+      }, 1000); // Increased timeout to ensure proper rendering
+    });
+  } catch (error) {
+    toast.error('Error generating PDF');
+    console.error('PDF generation error:', error);
+  }
+};
 
   if (loading) {
     return (

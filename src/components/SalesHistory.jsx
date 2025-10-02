@@ -196,68 +196,87 @@ const clearFilters = () => {
 
   // Helper to generate PDF for a sale
   const handleReprintBill = async (saleId) => {
-    try {
-      const saleDetails = await window.electronAPI.getSaleDetails(saleId);
-      // Render BillPDF in a hidden container
-      const pdfContainer = document.createElement('div');
-      pdfContainer.style.position = 'fixed';
-      pdfContainer.style.left = '-9999px';
-      pdfContainer.style.top = '0';
-      pdfContainer.style.width = '800px';
-      pdfContainer.style.zIndex = '-1';
-      document.body.appendChild(pdfContainer);
+  try {
+    const saleDetails = await window.electronAPI.getSaleDetails(saleId);
+    
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'fixed';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '210mm';
+    pdfContainer.style.zIndex = '-1';
+    document.body.appendChild(pdfContainer);
 
-      // Render BillPDF
-      import('react-dom/client').then(({ createRoot }) => {
-        const root = createRoot(pdfContainer);
-        root.render(
-          <BillPDF
-            billNumber={saleDetails.bill_number}
-            customer={{
-              name: saleDetails.customer_name,
-              contact: saleDetails.customer_contact,
-              address: saleDetails.customer_address,
-              gstin: saleDetails.customer_gstin
-            }}
-            items={saleDetails.items.map(item => ({
-              hsn_code: item.hsn_code,
-              sku: item.sku,
-              name: item.item_name,
-              quantity: item.quantity,
-              unit_price: item.unit_price
-            }))}
-            discount={saleDetails.discount}
-            subtotal={saleDetails.items.reduce(
-              (sum, item) => sum + item.unit_price * item.quantity,
-              0
-            )}
-            roundingOff={saleDetails.rounding_off}
-            total={saleDetails.total_amount}
-          />
-        );
-        setTimeout(async () => {
-          const canvas = await html2canvas(pdfContainer, { scale: 2 });
-          const imgData = canvas.toDataURL('image/png');
-          const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
+    import('react-dom/client').then(({ createRoot }) => { 
+      const root = createRoot(pdfContainer);
+      root.render(
+        <BillPDF
+          billNumber={saleDetails.bill_number}
+          customer={{
+            name: saleDetails.customer_name,
+            contact: saleDetails.customer_contact,
+            address: saleDetails.customer_address,
+            gstin: saleDetails.customer_gstin
+          }}
+          items={saleDetails.items.map(item => ({
+            hsn_code: item.hsn_code,
+            sku: item.sku,
+            name: item.item_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          }))}
+          discount={saleDetails.discount}
+          subtotal={saleDetails.items.reduce(
+            (sum, item) => sum + item.unit_price * item.quantity,
+            0
+          )}
+          roundingOff={saleDetails.rounding_off}
+          total={saleDetails.total_amount}
+        />
+      );
+      
+      setTimeout(async () => {
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        // Find all page divs with proper selector
+        const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+        
+        for (let i = 0; i < pageElements.length; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          const canvas = await html2canvas(pageElements[i], { 
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            width: 794, // A4 width in pixels at 96 DPI
+            height: 1123, // A4 height in pixels at 96 DPI
+            backgroundColor: '#ffffff'
           });
+          
+          const imgData = canvas.toDataURL('image/png');
           const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfWidth = pageWidth;
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-          pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`Invoice_${saleDetails.bill_number}.pdf`);
-          root.unmount();
-          document.body.removeChild(pdfContainer);
-          toast.success('PDF generated!');
-        }, 300);
-      });
-    } catch (error) {
-      toast.error('Error generating PDF');
-    }
-  };
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          
+          // Add image to fill the entire page
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+        }
+
+        pdf.save(`Invoice_${saleDetails.bill_number}.pdf`);
+        root.unmount();
+        document.body.removeChild(pdfContainer);
+        toast.success('PDF generated!');
+      }, 1000);
+    });
+  } catch (error) {
+    toast.error('Error generating PDF');
+  }
+};
 
   const handlePaidChange = async (saleId, isPaid) => {
     if (isPaid) {

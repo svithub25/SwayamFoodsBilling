@@ -302,30 +302,79 @@ const getFinalTotal = () => {
       }
 
       // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
-      if (action === 'pdf') {
-        try {
-          const element = billPdfRef.current;
-          // Temporarily render BillPDF with current sale data
-          await new Promise(resolve => setTimeout(resolve, 100)); // Ensure DOM updates
-          const canvas = await html2canvas(element, { scale: 2 });
-          const imgData = canvas.toDataURL("image/png");
-          const pdf = new jsPDF({ 
-            orientation: "portrait",
-            unit: "mm",  
-            format: "a4", 
-          }); 
+     // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
+if (action === 'pdf') {
+  try {
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'fixed';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '210mm';
+    pdfContainer.style.zIndex = '-1';
+    document.body.appendChild(pdfContainer);
+
+    import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(pdfContainer);
+      root.render(
+        <BillPDF
+          billNumber={billNumber}
+          customer={customerInfo}
+          items={cart.map(item => ({
+            hsn_code: item.hsn_code,
+            sku: item.sku,
+            name: item.name,
+            quantity: parseInt(item.quantity) || 0,
+            unit_price: item.unit_price
+          }))}
+          discount={discount}
+          subtotal={getSubtotal()}
+          roundingOff={getRoundingOff()}
+          total={getFinalTotal()}
+        />
+      );
+      
+      setTimeout(async () => {
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        // Find all page divs with proper selector
+        const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+        
+        for (let i = 0; i < pageElements.length; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          const canvas = await html2canvas(pageElements[i], { 
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            width: 794, // A4 width in pixels at 96 DPI
+            height: 1123, // A4 height in pixels at 96 DPI
+            backgroundColor: '#ffffff'
+          });
+          
+          const imgData = canvas.toDataURL('image/png');
           const pageWidth = pdf.internal.pageSize.getWidth();
-          const imgProps = pdf.getImageProperties(imgData);
-          const pdfWidth = pageWidth;
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-  
-          pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-          pdf.save(`Invoice_${billNumber}.pdf`);
-          toast.success('PDF generated and downloaded!'); 
-        } catch (err) {
-          toast.error('Error generating PDF');
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          
+          // Add image to fill the entire page
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
         }
-      }
+
+        pdf.save(`Invoice_${billNumber}.pdf`);
+        root.unmount();
+        document.body.removeChild(pdfContainer);
+        toast.success('PDF generated and downloaded!');
+      }, 1000);
+    });
+  } catch (err) {
+    toast.error('Error generating PDF');
+  }
+}
       // --- END PDF GENERATION ---
 
       // Now reset form

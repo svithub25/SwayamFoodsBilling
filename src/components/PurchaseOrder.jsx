@@ -7,12 +7,12 @@ import {
   Trash2,
   FileText,
   ArrowLeft,
-  RefreshCw,
+  RefreshCw, 
   Lock
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import Invoice from './Invoice'; // Make sure the path is correct
+import PurchaseOrderPdf from './PurchaseOrderPdf'; // Make sure the path is correct
 import { useHotkeys } from "react-hotkeys-hook";
 
 import PinProtected from './reusables/PinProtected';
@@ -31,7 +31,7 @@ const PurchaseOrder = () => {
   const [searchIndex, setSearchIndex] = useState(0);
   const qtyInputRefs = useRef({});
   const searchInputRef = useRef();
-  const invoiceRef = useRef();
+  const PurchaseOrderPdfRef = useRef();
 
   // --- Module protection state ---
 
@@ -136,27 +136,73 @@ const PurchaseOrder = () => {
     return orderItems.reduce((sum, item) => sum + calculateItemTotal(item), 0);
   };
 
-  // NEW PDF GENERATOR USING INVOICE COMPONENT
-  const handleDownloadPDF = async () => {
-    if (!selectedSupplier) return;
-    const element = invoiceRef.current;
-    const canvas = await html2canvas(element, { scale: 2 });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-    console.log(orderItems)
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pageWidth;
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+  // NEW PDF GENERATOR USING PurchaseOrderPdf COMPONENT
+ const handleDownloadPDF = async () => {
+  if (!selectedSupplier) return;
+  
+  try {
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'fixed';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '210mm';
+    pdfContainer.style.zIndex = '-1';
+    document.body.appendChild(pdfContainer);
 
-    pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`Shiva_Purchase_order_${Date.now()}.pdf`);
-  };
+    import('react-dom/client').then(({ createRoot }) => {
+      const root = createRoot(pdfContainer);
+      root.render(
+        <PurchaseOrderPdf
+          billNumber={`PO-${Date.now()}`}
+          customer={PurchaseOrderPdfCustomer}
+          items={PurchaseOrderPdfItems}
+          discount={0}
+          subtotal={getOrderTotal()}
+          total={getOrderTotal()}
+        />
+      );
+      
+      setTimeout(async () => {
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        // Find all page divs with proper selector
+        const pageElements = pdfContainer.querySelectorAll('#purchase-order-pdf > div');
+        
+        for (let i = 0; i < pageElements.length; i++) {
+          if (i > 0) {
+            pdf.addPage();
+          }
+          
+          const canvas = await html2canvas(pageElements[i], { 
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            width: 794, // A4 width in pixels at 96 DPI
+            height: 1123, // A4 height in pixels at 96 DPI
+            backgroundColor: '#ffffff'
+          });
+          
+          const imgData = canvas.toDataURL('image/png');
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          
+          // Add image to fill the entire page
+          pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+        }
+
+        pdf.save(`Purchase_Order_${Date.now()}.pdf`);
+        root.unmount();
+        document.body.removeChild(pdfContainer);
+      }, 1000); 
+    });
+  } catch (error) {
+    console.error('PDF generation error:', error);
+  }
+}; 
 
   // --- Module protection UI ---
 
@@ -168,16 +214,16 @@ const PurchaseOrder = () => {
     );
   }
 
-  // Prepare invoice props
+  // Prepare PurchaseOrderPdf props
   const selectedSupplierData = suppliers.find(s => s.id == selectedSupplier) || {};
-  const invoiceCustomer = {
+  const PurchaseOrderPdfCustomer = {
     name: selectedSupplierData.name || '',
     address: selectedSupplierData.address || '',
     gstin: selectedSupplierData.gstin || ''
   };
 
-  // Map orderItems to invoice items format
-  const invoiceItems = orderItems.map(item => ({
+  // Map orderItems to PurchaseOrderPdf items format
+  const PurchaseOrderPdfItems = orderItems.map(item => ({
     hsn_code: item.hsn_code || '',
     sku: item.sku || '',
     name: item.name,
@@ -199,13 +245,13 @@ const PurchaseOrder = () => {
   return (
     <PinProtected message="This module is protected and requires PIN verification to access." modulename='Purchase Order'> 
       <div className="space-y-6">
-        {/* Hidden Invoice for PDF generation */}
+        {/* Hidden PurchaseOrderPdf for PDF generation */}
         <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-          <div ref={invoiceRef}>
-            <Invoice
+          <div ref={PurchaseOrderPdfRef}>
+            <PurchaseOrderPdf
               billNumber={`PO-${Date.now()}`}
-              customer={invoiceCustomer}
-              items={invoiceItems}
+              customer={PurchaseOrderPdfCustomer}
+              items={PurchaseOrderPdfItems}
               discount={0}
               subtotal={getOrderTotal()}
               total={getOrderTotal()}
