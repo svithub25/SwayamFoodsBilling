@@ -930,8 +930,8 @@ const Billing = () => {
       )}
 
       {/* Hidden BillPDF for PDF generation */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        {/* <div> */}
+      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
+        <div>
         <div ref={billPdfRef}>
           <BillPDF
             billNumber={billNumber}

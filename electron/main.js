@@ -1059,12 +1059,14 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
       SELECT COALESCE(SUM(total_amount), 0) AS total
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
     `).get(startDate, endDate);
 
     const totalOrders = db.prepare(`
       SELECT COUNT(*) AS count
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
     `).get(startDate, endDate);
 
     const avgOrderValue = totalOrders.count > 0 ? totalSales.total / totalOrders.count : 0;
@@ -1081,6 +1083,8 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
         AND LENGTH(TRIM(s.customer_contact)) = 10
         AND s.customer_contact GLOB '[0-9]*'
         AND DATE(s.sale_date) BETWEEN ? AND ?
+        AND (s.status_code = 0 OR s.status_code IS NULL)
+       
       GROUP BY s.customer_contact
       ORDER BY revenue DESC
       LIMIT 1
@@ -1095,6 +1099,9 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN items i ON si.item_id = i.id 
       WHERE DATE(s.sale_date) BETWEEN ? AND ?
+      AND (s.status_code = 0 OR s.status_code IS NULL)
+      AND (si.status_code = 0 OR si.status_code IS NULL)
+      
       GROUP BY si.item_id, i.name
       ORDER BY revenue DESC
       LIMIT 10
@@ -1110,6 +1117,9 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
       LEFT JOIN items i ON si.item_id = i.id 
       LEFT JOIN categories c ON i.category_id = c.id
       WHERE DATE(s.sale_date) BETWEEN ? AND ?
+      AND (s.status_code = 0 OR s.status_code IS NULL)
+      AND (si.status_code = 0 OR si.status_code IS NULL)
+      
       GROUP BY c.id, category
       ORDER BY amount DESC
     `).all(startDate, endDate);
@@ -1121,6 +1131,7 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
              COUNT(*) AS orders
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
       GROUP BY DATE(sale_date)
       ORDER BY DATE(sale_date) ASC
     `).all(startDate, endDate);
@@ -1142,6 +1153,7 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
         COUNT(*) AS orders
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
       GROUP BY strftime('%w', sale_date)
       ORDER BY strftime('%w', sale_date)
     `).all(startDate, endDate);
@@ -1156,6 +1168,7 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
         COUNT(*) AS orders
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
       GROUP BY strftime('%Y-%W', sale_date)
       ORDER BY week_start ASC
     `).all(startDate, endDate);
@@ -1168,6 +1181,7 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
         COUNT(*) AS orders
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
       GROUP BY month
       ORDER BY month ASC
     `).all(startDate, endDate);
@@ -1180,6 +1194,7 @@ ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
         COUNT(*) AS orders
       FROM sales
       WHERE DATE(sale_date) BETWEEN ? AND ?
+      AND (status_code = 0 OR status_code IS NULL)
       GROUP BY year
       ORDER BY year ASC
     `).all(startDate, endDate);

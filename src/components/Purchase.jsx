@@ -822,9 +822,9 @@ const getFinalTotal = () => Math.round(totalWithGst);
                 onBlur={() => setTimeout(() => setShowSupplierList(false), 100)}
                 onKeyDown={handleSupplierInputKeyDown}
                 placeholder="Type to search supplier"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="min-w-[160px] w-full md:w-[220px] px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-base"
                 autoComplete="off"
-                tabIndex={0}
+                tabIndex={0} 
               />
               {showSupplierList && filteredSuppliers.length > 0 && (
                 <ul className="absolute z-10 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">

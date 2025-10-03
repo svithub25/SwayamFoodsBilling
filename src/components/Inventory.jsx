@@ -180,8 +180,12 @@ const Inventory = () => {
                   Min Stock
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  MRP
+                 Salesman Rate
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                 Customer Rate
+                </th>
+                
                 {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Last Supplier
                 </th> */}
@@ -214,9 +218,13 @@ const Inventory = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-600">{item.minimum_stock}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">₹{item.mrp}</span>
+                   <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">₹{item.salesman_rate}</span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">₹{item.customer_rate}</span>
+                  </td>
+                 
                   {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {item.supplier_name || 'N/A'}
                   </td> */}

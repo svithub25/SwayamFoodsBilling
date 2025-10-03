@@ -847,13 +847,13 @@ const Admin = () => {
                       onChange={e => setSupplierFilters({ ...supplierFilters, contact: e.target.value })}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
                     />
-                    <input
+                    {/* <input
                       type="text"
                       placeholder="GSTIN"
                       value={supplierFilters.gstin}
                       onChange={e => setSupplierFilters({ ...supplierFilters, gstin: e.target.value })}
                       className="px-3 py-2 border border-gray-300 rounded-lg"
-                    />
+                    /> */}
                   </div>
                   <div className="flex mt-2">
                     <button
