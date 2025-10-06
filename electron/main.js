@@ -289,6 +289,15 @@ CREATE TABLE IF NOT EXISTS closing_stock (
   FOREIGN KEY(item_id) REFERENCES items(id)
 );
 
+
+  CREATE TABLE IF NOT EXISTS bill_message (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    message TEXT NOT NULL,
+    status_code INTEGER DEFAULT 0,
+    is_print INTEGER DEFAULT 0,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   `);
 
   // Insert default data
@@ -2446,7 +2455,7 @@ function reduceClosingStock(itemId, qtySold) {
 ipcMain.handle('get-Salesman-Commission', async () => {
   // Get all sales where sale_type is 'customer'
   const sales = db.prepare(`
-    SELECT s.id as sale_id, s.bill_number, s.sale_date, s.salesman_id, salesman.name as salesman_name
+    SELECT s.id as sale_id, s.bill_number,s.customer_name,s.customer_contact, s.sale_date, s.salesman_id, salesman.name as salesman_name
     FROM sales s
     LEFT JOIN salesman ON s.salesman_id = salesman.id
     WHERE s.sale_type = 'customer' AND (s.status_code = 0 OR s.status_code IS NULL)
@@ -2481,6 +2490,8 @@ ipcMain.handle('get-Salesman-Commission', async () => {
       sale_id: sale.sale_id,
       bill_number: sale.bill_number,
       sale_date: sale.sale_date,
+      customer_name: sale.customer_name,
+      customer_contact: sale.customer_contact,
       salesman_id: sale.salesman_id,
       salesman_name: sale.salesman_name,
       items: itemCommissions,
@@ -2489,5 +2500,15 @@ ipcMain.handle('get-Salesman-Commission', async () => {
   }
 
   return commissionData;
+});
+
+ipcMain.handle('get-bill-message', async () => {
+  const row = db.prepare('SELECT * FROM bill_message WHERE status_code = 0 ORDER BY updated_at DESC LIMIT 1').get();
+  return row?.message || '';
+});
+
+ipcMain.handle('set-bill-message', async (event, message) => {
+  db.prepare('INSERT INTO bill_message (message) VALUES (?)').run(message);
+  return true;
 });
 // ...existing code...

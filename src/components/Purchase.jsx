@@ -980,7 +980,7 @@ const getFinalTotal = () => Math.round(totalWithGst);
                                 }
                               }}
                               placeholder="Type to search item"
-                              className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                              className="w-[300px] px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-base"
                               autoComplete="off"
                               tabIndex={0}
                             />
@@ -1008,7 +1008,7 @@ const getFinalTotal = () => Math.round(totalWithGst);
                             </DropdownPortal>
                           </div>
                         </td>
-                        <td className="px-2 py-3">
+                        <td className="px-4 py-3">
                           {item.id && (
                             <button
                               type="button"
@@ -1025,10 +1025,9 @@ const getFinalTotal = () => Math.round(totalWithGst);
                           <input
                             id={`qty-input-${index}`}
                             type="number"
-                            onWheel={e => e.target.blur()} 
                             value={item.quantity}
                             onChange={(e) => updatePurchaseItem(index, 'quantity', parseInt(e.target.value))}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
                             min="0"  
                             tabIndex={0}
                             onKeyDown={e => {
@@ -1046,10 +1045,9 @@ const getFinalTotal = () => Math.round(totalWithGst);
                           <input
                             type="number"
                             step="0.01"
-                            onWheel={e => e.target.blur()}
                             value={item.unit_price}
                             onChange={(e) => updatePurchaseItem(index, 'unit_price', parseFloat(e.target.value))}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
                             min="0"
                             tabIndex={0}
                             onKeyDown={e => {
@@ -1083,7 +1081,7 @@ const getFinalTotal = () => Math.round(totalWithGst);
                           type="number"
                           value={item.discount || 0}
                           onChange={e => updatePurchaseItem(index, 'discount', parseFloat(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
                           min="0"
                           max="100"
                           placeholder="%" 

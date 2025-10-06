@@ -35,6 +35,7 @@ const loadCommissions = async () => {
   setLoading(true);
   try {
     const data = await window.electronAPI.getSalesmanCommission();
+    console.log('Fetched commissions:', data);
     // Sort by bill number descending (extract numeric part)
     data.sort((a, b) => {
       // Example bill: SH/25-26/5
@@ -237,6 +238,9 @@ const highlightText = (text, highlight) => {
                   Salesman
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -249,12 +253,16 @@ const highlightText = (text, highlight) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredCommissions.map(sale => (
+                
                 <tr key={sale.sale_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {highlightText(sale.bill_number, filters.billNumber)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {sale.salesman_name || 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {sale.customer_name || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {new Date(sale.sale_date).toLocaleDateString()}

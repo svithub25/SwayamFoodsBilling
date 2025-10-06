@@ -1,11 +1,12 @@
 import React from "react";
 import companyLogo from "../Assets/logo.png";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 8;
 
-function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roundingOff = 0, total = 0 }) {
+function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roundingOff = 0, total = 0, sale_type = "", salesman_name = "" ,note = ""}) {
   // Split items into pages
-  const pages = [];
+  console.log(sale_type) 
+  const pages = []; 
   for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
     pages.push(items.slice(i, i + ITEMS_PER_PAGE));
   }
@@ -58,6 +59,12 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
               })}
             </span>
           </div>
+          {salesman_name && (
+            <div className="flex justify-between">
+              <span className="text-[hsl(215.4_16.3%_46.9%)]">Salesman:</span>
+              <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{salesman_name}</span>
+            </div>
+          )}
         </div>
       </div>
       <div className="space-y-3">
@@ -151,8 +158,13 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
       </div>
     </div>
   );
-
-  const Footer = () => (
+const Footer = () => (
+  <div>
+    {note && note.trim().length > 0 && (<div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 text-sm text-blue-900 rounded">
+      <strong>Note from Swayam:</strong>
+      <br /> 
+     {note}
+    </div>)}
     <div className="border-t border-[hsl(220_13%_91%)] pt-4">
       <div className="text-center space-y-2">
         <p className="text-[hsl(217_19%_35%)] font-semibold text-sm">
@@ -163,17 +175,17 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
         </p>
         <div className="flex justify-center space-x-4 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
           <span>Email: swayamkolhapur@gmail.com</span>
-            <span>•</span>
-            <span>Phone: 9371446315</span>
-            <span>•</span>
-            <span>Facebook : स्वयंम् </span>
-            <span>•</span>
-            <span>Instagram : swayamkolhapur </span>
+          <span>•</span>
+          <span>Phone: 9371446315</span>
+          <span>•</span>
+          <span>Facebook : स्वयंम् </span>
+          <span>•</span>
+          <span>Instagram : swayamkolhapur </span>
         </div>
       </div>
     </div>
-  );
-
+  </div>
+);
   return (
     <div id="bill-pdf">
       {pages.map((pageItems, pageIndex) => (

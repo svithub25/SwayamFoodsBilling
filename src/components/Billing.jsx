@@ -20,6 +20,7 @@ const Billing = () => {
   const [lastSaleData, setLastSaleData] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
   const [selectedSalesman, setSelectedSalesman] = useState('');
+  const [billNarration, setBillNarration] = useState('');
   const [customers, setCustomers] = useState([]);
   const [customerDropdown, setCustomerDropdown] = useState(false);
   const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
@@ -47,17 +48,18 @@ const Billing = () => {
 
   useEffect(() => {
     async function fetchSalesmen() {
-      const list = await window.electronAPI.getSalesmen();
-      setSalesmen(list);
+      const list = await window.electronAPI.getSalesmen(); 
+      setSalesmen(list); 
     }
     fetchSalesmen();
   }, []);
-
-  useEffect(() => {
-    async function fetchCustomers() {
+   async function fetchCustomers() {
       const list = await window.electronAPI.getCustomers();
       setCustomers(list || []);
     }
+
+  useEffect(() => {
+   
     fetchCustomers();
   }, []);
 
@@ -312,6 +314,7 @@ const Billing = () => {
           pdfContainer.style.width = '210mm';
           pdfContainer.style.zIndex = '-1';
           document.body.appendChild(pdfContainer);
+         
 
           import('react-dom/client').then(({ createRoot }) => {
             const root = createRoot(pdfContainer);
@@ -326,10 +329,12 @@ const Billing = () => {
                   quantity: parseInt(item.quantity) || 0,
                   unit_price: item.unit_price
                 }))}
-                discount={discount}
+                discount={discount} 
                 subtotal={getSubtotal()}
                 roundingOff={getRoundingOff()}
                 total={getFinalTotal()}
+                salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""} 
+                note={billNarration} 
               />
             );
 
@@ -398,6 +403,7 @@ const Billing = () => {
       await generateBillNumber();
       await loadItems();
       toast.success('Sale completed successfully!');
+       fetchCustomers();
     } catch (error) {
       console.error('Error completing sale:', error);
       toast.error('Error completing sale');
@@ -668,7 +674,23 @@ const Billing = () => {
               </div>
             </div>
           </div>
-
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Bill Narration
+            </h2>
+            
+              <div>
+                
+               <textarea
+                   value={billNarration}
+                  onChange={e => setBillNarration(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                />  
+              
+            </div>
+          </div>
           {/* Search */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="relative">
@@ -927,11 +949,11 @@ const Billing = () => {
             )}
           </div>
         </div>
-      )}
+      )} 
 
       {/* Hidden BillPDF for PDF generation */}
-      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
-        <div>
+      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        {/* <div> */}
         <div ref={billPdfRef}>
           <BillPDF
             billNumber={billNumber}
@@ -945,8 +967,11 @@ const Billing = () => {
             }))}
             discount={discount}
             subtotal={getSubtotal()}
-            roundingOff={getRoundingOff()}
+            roundingOff={getRoundingOff()} 
             total={getFinalTotal()}
+            sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
+            salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+            note={billNarration} // <-- add this line 
           />
         </div>
       </div>
