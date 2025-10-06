@@ -410,6 +410,146 @@ const Billing = () => {
     }
   };
 
+  // Add this function to handle printing
+const handlePrintSale = async () => {
+  const filteredCart = cart.filter(item => parseInt(item.quantity) > 0);
+  if (filteredCart.length === 0) {
+    toast.error('Cart is empty');
+    return;
+  }
+
+  try {
+    // First complete the sale
+    await completeSaleData();
+    
+    // Generate PDF for printing
+    const pdfContainer = document.createElement('div');
+    pdfContainer.style.position = 'fixed';
+    pdfContainer.style.left = '-9999px';
+    pdfContainer.style.top = '0';
+    pdfContainer.style.width = '210mm';
+    pdfContainer.style.zIndex = '-1';
+    document.body.appendChild(pdfContainer);
+
+    const { createRoot } = await import('react-dom/client');
+    const root = createRoot(pdfContainer);
+    
+    root.render(
+      <BillPDF
+        billNumber={billNumber}
+        customer={customerInfo}
+        items={cart.map(item => ({
+          hsn_code: item.hsn_code,
+          sku: item.sku,
+          name: item.name,
+          quantity: parseInt(item.quantity) || 0,
+          unit_price: item.unit_price
+        }))}
+        discount={discount}
+        subtotal={getSubtotal()}
+        roundingOff={getRoundingOff()}
+        total={getFinalTotal()}
+        salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+        note={billNarration}
+      />
+    );
+
+    setTimeout(async () => {
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+
+      for (let i = 0; i < pageElements.length; i++) {
+        if (i > 0) pdf.addPage();
+
+        const canvas = await html2canvas(pageElements[i], {
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true, 
+          width: 794, // A4 width in pixels at 96 DPI
+          height: 1123, 
+          backgroundColor: '#ffffff'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+      }
+
+      // Get PDF as array buffer
+      const pdfOutput = pdf.output('arraybuffer');
+      
+      // Send to printer
+      const result = await window.electronAPI.printPdf(pdfOutput);
+      
+      if (result.success) {
+        toast.success('Invoice sent to printer!');
+      } else {
+        toast.error('Failed to print: ' + result.error);
+      }
+
+      // Cleanup
+      root.unmount();
+      document.body.removeChild(pdfContainer);
+    }, 1000);
+
+  } catch (error) {
+    console.error('Print error:', error);
+    toast.error('Error printing invoice');
+  }
+};
+
+// Separate function for just saving sale data
+const completeSaleData = async () => {
+  const filteredCart = cart.filter(item => parseInt(item.quantity) > 0);
+  
+  // Check stock and customer validation...
+  // (Copy the validation logic from your completeSale function)
+  
+  const saleItems = filteredCart.map(item => {
+    const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
+    const origItem = items.find(i => i.id === item.id);
+    return {
+      id: item.id,
+      quantity: parseInt(item.quantity),
+      unit_price: item.unit_price,
+      gst_percentage: item.gst_percentage,
+      total_price: totalAmount,
+      customer_rate: origItem?.customer_rate ?? item.unit_price,
+      salesman_rate: origItem?.salesman_rate ?? item.unit_price
+    };
+  });
+
+  const saleData = {
+    bill_number: billNumber,
+    customer_name: customerInfo.name || null,
+    customer_contact: customerInfo.contact || null,
+    customer_address: customerInfo.address || null,
+    customer_gstin: customerInfo.gstin || null,
+    sale_date: new Date().toISOString().split('T')[0],
+    items: saleItems,
+    discount,
+    total_amount: getFinalTotal(),
+    rounding_off: getRoundingOff(),
+    salesman_id: selectedSalesman || null,
+    sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')
+  };
+
+  await window.electronAPI.saveSale(saleData);
+  
+  // Reset form
+  setCart([]);
+  setDiscount(0);
+  setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+  await generateBillNumber();
+  await loadItems();
+  fetchCustomers();
+};
   // --- Show purchase history for item ---
   const showPurchaseHistory = async (itemId) => {
     try {
@@ -880,7 +1020,7 @@ const Billing = () => {
                     Complete Sale (Ctrl+C)
                   </button>
                   <button
-                    onClick={() => completeSale('print')}
+                    onClick={handlePrintSale}
                     className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
                   >
@@ -952,8 +1092,8 @@ const Billing = () => {
       )} 
 
       {/* Hidden BillPDF for PDF generation */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        {/* <div> */}
+      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
+        <div>
         <div ref={billPdfRef}>
           <BillPDF
             billNumber={billNumber}
@@ -979,4 +1119,4 @@ const Billing = () => {
   );
 };
 
-export default Billing; 
+export default Billing;

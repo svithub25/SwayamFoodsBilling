@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deletePurchase: (billId) => ipcRenderer.invoke('delete-purchase', billId),
   updateSalePaidStatus: (saleId, isPaid) => ipcRenderer.invoke('update-sale-paid-status', saleId, isPaid),
   updateSaleApprovedStatus: (saleId, isApproved) => ipcRenderer.invoke('update-sale-approved-status', saleId, isApproved),
+  printPdf: (pdfData) => ipcRenderer.invoke('print-pdf', pdfData),
 
   // Transactions
   getTransactions: (filters) => ipcRenderer.invoke('get-transactions', filters),

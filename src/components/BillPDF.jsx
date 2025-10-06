@@ -12,7 +12,7 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
   }
 
   const Header = () => (
-    <div className="flex items-center   border-b border-[hsl(220_13%_91%)] pb-6 mb-8">
+    <div className="flex items-center   border-b border-[hsl(0,0%,0%)] pb-2 mb-2">
       <div className="flex items-center gap-8">
         <img
           src={companyLogo}
@@ -27,8 +27,8 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
       </div>
       <div className="text-left ml-12 space-y-1">
       
-          <h2 className="text-2xl font-bold text-[hsl(214_84%_56%)]">INVOICE</h2>
-          <div className="text-sm text-[hsl(215.4_16.3%_46.9%)] space-y-1">
+          <h2 className="text-2xl font-bold text-[hsl(0,0%,0%)]">INVOICE</h2>
+          <div className="text-sm text-[hsl(0,0%,0%)] space-y-1">
             <p>Office Add. : 1815, D Ward, Shukrawar Peth, kadre Galli, near Piwla wada, Kolhapur</p>
             <p>Shop Add. : Tele Galli, Sukrawar Peth, Kolhapur</p>
             {/* <p>Kolhapur</p> */}
@@ -41,17 +41,17 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
   const BillDetails = () => (
     <div className="grid grid-cols-2 gap-6 mb-8">
       <div className="space-y-3">
-        <h3 className="text-xs font-semibold text-[hsl(217_19%_35%)] uppercase tracking-wider mb-2">
+        <h3 className="text-xs font-semibold text-[hsl(0,0%,0%)] uppercase tracking-wider mb-2">
           Bill Details
         </h3>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between">
-            <span className="text-[hsl(215.4_16.3%_46.9%)]">Bill No:</span>
-            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{billNumber}</span>
+            <span className="text-[hsl(0,0%,0%)]">Bill No:</span>
+            <span className="font-medium text-[hsl(0,0%,0%)]">{billNumber}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-[hsl(215.4_16.3%_46.9%)]">Date:</span>
-            <span className="font-medium text-[hsl(222.2_84%_4.9%)]">
+            <span className="text-[hsl(0,0%,0%)]">Date:</span>
+            <span className="font-medium text-[hsl(0,0%,0%)]">
               {new Date().toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'long',
@@ -62,23 +62,23 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
           {salesman_name && (
             <div className="flex justify-between">
               <span className="text-[hsl(215.4_16.3%_46.9%)]">Salesman:</span>
-              <span className="font-medium text-[hsl(222.2_84%_4.9%)]">{salesman_name}</span>
+              <span className="font-medium text-[hsl(0,0%,0%)]">{salesman_name}</span>
             </div>
           )}
         </div>
       </div>
       <div className="space-y-3">
-        <h3 className="text-xs font-semibold text-[hsl(217_19%_35%)] uppercase tracking-wider mb-2">
+        <h3 className="text-xs font-semibold text-[hsl(0,0%,0%)] uppercase tracking-wider mb-2">
           Billed To
         </h3>
-        <div className="bg-[hsl(220_14%_96%)] p-3 rounded-lg space-y-1">
-          <p className="font-semibold text-[hsl(222.2_84%_4.9%)] text-sm">{customer.name || "Counter Sale"}</p>
-          <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">{customer.address || ""}</p>
+        <div className="bg-[hsl(0,0%,100%)] border border-[hsl(0,0%,0%)] p-3 rounded-lg space-y-1">
+          <p className="font-semibold text-[hsl(0,0%,0%)] text-sm">{customer.name || "Counter Sale"}</p>
+          <p className="text-xs text-[hsl(0,0%,0%)]">{customer.address || ""}</p>
           {customer.gstin && (
-            <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">GSTIN: {customer.gstin}</p>
+            <p className="text-xs text-[hsl(0,0%,0%)]">GSTIN: {customer.gstin}</p>
           )}
           {customer.contact && (
-            <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">Contact: {customer.contact}</p>
+            <p className="text-xs text-[hsl(0,0%,0%)]">Contact: {customer.contact}</p>
           )}
         </div>
       </div>
@@ -87,13 +87,11 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
 
   const ItemsTable = ({ pageItems, isLastPage }) => (
     <div className={`${!isLastPage ? 'mb-8' : 'mb-6'}`}>
-      <h3 className="text-xs font-semibold text-[hsl(217_19%_35%)] uppercase tracking-wider mb-3">
-        Items
-      </h3>
-      <div className="overflow-hidden rounded-lg border border-[hsl(220_13%_91%)]">
+     
+      <div className="overflow-hidden rounded-lg border border-[hsl(0,0%,0%)]">
           <table className="w-full " > 
           <thead>
-            <tr className="bg-[hsl(214_84%_56%)] text-white">
+            <tr className="bg-[hsl(0,0%,100%)] border-b border-[hsl(0,0%,0%)] text-black">
               <th className="text-left py-3 px-4  font-semibold text-xs w-[40px]">Sr No</th>
               <th className="text-left py-3 px-4 font-semibold text-xs w-[40%]">Item</th>
               <th className="text-center py-3 px-4 font-semibold text-xs w-[12%]">Quantity</th>
@@ -107,15 +105,13 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
               return (
                 <tr
                   key={idx}
-                  className={`border-b border-[hsl(220_13%_91%)] ${
-                    idx % 2 === 0 ? "bg-white" : "bg-[hsl(220_14%_96%)]"
-                  }`}
+                  className={`border-b border-[hsl(0,0%,0%)]`}
                 >
-                  <td className="py-3 px-4 text-xs text-left text-[hsl(222.2_84%_4.9%)]">{globalIndex + 1}</td>
-                  <td className="py-3 px-4 text-xs text-[hsl(222.2_84%_4.9%)] font-medium w-[40%]">{item.name}</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)] w-[12%]">{item.quantity}</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)] w-[14%]">₹{item.unit_price}</td>
-                  <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)] w-[14%]">₹{(item.unit_price * item.quantity).toFixed(2)}</td>
+                  <td className="py-3 px-4 text-xs text-left text-[hsl(0,0%,0%)]">{globalIndex + 1}</td>
+                  <td className="py-3 px-4 text-xs text-[hsl(0,0%,0%)] font-medium w-[40%]">{item.name}</td>
+                  <td className="py-3 px-4 text-xs text-center text-[hsl(0,0%,0%)] w-[12%]">{item.quantity}</td>
+                  <td className="py-3 px-4 text-xs text-center text-[hsl(0,0%,0%)] w-[14%]">₹{item.unit_price}</td>
+                  <td className="py-3 px-4 text-xs text-center text-[hsl(0,0%,0%)] w-[14%]">₹{(item.unit_price * item.quantity).toFixed(2)}</td>
                 </tr>
               );
             })}
@@ -151,7 +147,7 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
             <span className="ml-2 text-sm">{roundingOff >= 0 ? '+' : ''}₹{roundingOff.toFixed(2)}</span>
           </div>
         )}
-        <div className="border-t pt-2">
+        <div className="border-t  border-[hsl(0,0%,0%)] pt-2">
           <span className="font-bold text-base">Total:</span>
           <span className="ml-2 font-bold text-base">₹{total.toFixed(2)}</span>
         </div>
@@ -160,20 +156,18 @@ function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roun
   );
 const Footer = () => (
   <div>
-    {note && note.trim().length > 0 && (<div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 text-sm text-blue-900 rounded">
+    {note && note.trim().length > 0 && (<div className=" border-2 border-black-800 p-4 mb-4 text-sm text-black-900 rounded">
       <strong>Note from Swayam:</strong>
       <br /> 
      {note}
     </div>)}
-    <div className="border-t border-[hsl(220_13%_91%)] pt-4">
+    <div className="border-t border-[hsl(0,0%,0%)] pt-4">
       <div className="text-center space-y-2">
-        <p className="text-[hsl(217_19%_35%)] font-semibold text-sm">
+        <p className="text-[hsl(0,0%,0%)] font-semibold text-sm">
           Thank you for your business!
         </p>
-        <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">
-          This is a computer-generated invoice and does not require signature.
-        </p>
-        <div className="flex justify-center space-x-4 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
+       
+        <div className="flex justify-center space-x-4 text-xs text-[hsl(0,0%,0%)] mt-3">
           <span>Email: swayamkolhapur@gmail.com</span>
           <span>•</span>
           <span>Phone: 9371446315</span>

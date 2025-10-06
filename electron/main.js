@@ -6,7 +6,7 @@ import pkg from 'node-machine-id';
 const { machineIdSync } = pkg;
  import { execSync } from "child_process";
 const isDev = process.env.NODE_ENV === 'development';
-import { app, BrowserWindow, dialog, ipcMain } from 'electron' ;
+import { app, BrowserWindow, dialog,shell, ipcMain } from 'electron' ;
 import { fileURLToPath } from 'url';
 import { dirname } from 'path'; 
 import Database from 'better-sqlite3'; 
@@ -454,7 +454,7 @@ ipcMain.handle('login', async (event, username, password) => {
 
 ipcMain.handle('verify-pin', async (event, pin) => {
   try {
-    return pin === '2020';
+    return pin === '4040';
   } catch (error) {
     console.error(error);
     throw error;
@@ -2511,4 +2511,34 @@ ipcMain.handle('set-bill-message', async (event, message) => {
   db.prepare('INSERT INTO bill_message (message) VALUES (?)').run(message);
   return true;
 });
-// ...existing code...
+
+ipcMain.handle('print-pdf', async (event, pdfData) => {
+  try {
+    // Create temp file
+    const tempDir = os.tmpdir();
+    const tempFilePath = path.join(tempDir, `invoice_${Date.now()}.pdf`);
+    
+    // Convert ArrayBuffer to Buffer
+    const buffer = Buffer.from(pdfData);
+    
+    // Write PDF data to temp file
+    fs.writeFileSync(tempFilePath, buffer);
+    
+    // Print the PDF using system default printer
+    await shell.openPath(tempFilePath);
+    
+    // Clean up temp file after a delay
+    setTimeout(() => {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (err) {
+        console.log('Could not delete temp file:', err);
+      }
+    }, 10000);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Print error:', error);
+    return { success: false, error: error.message };
+  }
+});
