@@ -49,6 +49,7 @@ const Billing = () => {
   useEffect(() => {
     async function fetchSalesmen() {
       const list = await window.electronAPI.getSalesmen(); 
+      console.log('Fetched salesmen:', list);
       setSalesmen(list); 
     }
     fetchSalesmen();
@@ -319,27 +320,31 @@ const Billing = () => {
           import('react-dom/client').then(({ createRoot }) => {
             const root = createRoot(pdfContainer);
             root.render(
-              <BillPDF
-                billNumber={billNumber}
-                customer={customerInfo}
-                items={cart.map(item => ({
-                  hsn_code: item.hsn_code,
-                  sku: item.sku,
-                  name: item.name,
-                  quantity: parseInt(item.quantity) || 0,
-                  unit_price: item.unit_price
-                }))}
-                discount={discount} 
-                subtotal={getSubtotal()}
-                roundingOff={getRoundingOff()}
-                total={getFinalTotal()}
-                salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""} 
-                note={billNarration} 
-              />
+             <BillPDF
+  billNumber={billNumber}
+  customer={customerInfo}
+  items={cart.map(item => ({
+    hsn_code: item.hsn_code,
+    sku: item.sku,
+    name: item.name,
+    quantity: parseInt(item.quantity) || 0,
+    unit_price: item.unit_price
+  }))}
+  discount={discount}
+  subtotal={getSubtotal()}
+  roundingOff={getRoundingOff()}
+  total={getFinalTotal()}
+  sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
+  salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+  salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
+ || ""}
+  salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
+  note={billNarration}
+/>
             );
 
             setTimeout(async () => {
-              const pdf = new jsPDF({
+              const pdf = new jsPDF({ 
                 orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
@@ -435,24 +440,28 @@ const handlePrintSale = async () => {
     const root = createRoot(pdfContainer);
     
     root.render(
-      <BillPDF
-        billNumber={billNumber}
-        customer={customerInfo}
-        items={cart.map(item => ({
-          hsn_code: item.hsn_code,
-          sku: item.sku,
-          name: item.name,
-          quantity: parseInt(item.quantity) || 0,
-          unit_price: item.unit_price
-        }))}
-        discount={discount}
-        subtotal={getSubtotal()}
-        roundingOff={getRoundingOff()}
-        total={getFinalTotal()}
-        salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-        note={billNarration}
-      />
-    );
+     <BillPDF
+  billNumber={billNumber}
+  customer={customerInfo}
+  items={cart.map(item => ({
+    hsn_code: item.hsn_code,
+    sku: item.sku,
+    name: item.name,
+    quantity: parseInt(item.quantity) || 0,
+    unit_price: item.unit_price
+  }))}
+  discount={discount}
+  subtotal={getSubtotal()}
+  roundingOff={getRoundingOff()}
+  total={getFinalTotal()}
+  sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
+  salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+  salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
+ || ""}
+  salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
+  note={billNarration}
+/>
+    ); 
 
     setTimeout(async () => {
       const pdf = new jsPDF({
@@ -1095,24 +1104,27 @@ const completeSaleData = async () => {
       {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
         <div>
         <div ref={billPdfRef}>
-          <BillPDF
-            billNumber={billNumber}
-            customer={customerInfo}
-            items={cart.map(item => ({
-              hsn_code: item.hsn_code,
-              sku: item.sku,
-              name: item.name,
-              quantity: parseInt(item.quantity) || 0,
-              unit_price: item.unit_price
-            }))}
-            discount={discount}
-            subtotal={getSubtotal()}
-            roundingOff={getRoundingOff()} 
-            total={getFinalTotal()}
-            sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
-            salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-            note={billNarration} // <-- add this line 
-          />
+         <BillPDF
+          billNumber={billNumber}
+          customer={customerInfo}
+          items={cart.map(item => ({
+            hsn_code: item.hsn_code,
+            sku: item.sku,
+            name: item.name,
+            quantity: parseInt(item.quantity) || 0,
+            unit_price: item.unit_price
+          }))}
+          discount={discount}
+          subtotal={getSubtotal()}
+          roundingOff={getRoundingOff()}
+          total={getFinalTotal()}
+          sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
+          salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+          salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
+ || ""}
+          salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
+          note={billNarration}
+        />
         </div>
       </div>
     </div>

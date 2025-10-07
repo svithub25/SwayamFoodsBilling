@@ -2512,6 +2512,36 @@ ipcMain.handle('set-bill-message', async (event, message) => {
   return true;
 });
 
+// ipcMain.handle('print-pdf', async (event, pdfData) => {
+//   try {
+//     // Create temp file
+//     const tempDir = os.tmpdir();
+//     const tempFilePath = path.join(tempDir, `invoice_${Date.now()}.pdf`);
+    
+//     // Convert ArrayBuffer to Buffer
+//     const buffer = Buffer.from(pdfData);
+    
+//     // Write PDF data to temp file
+//     fs.writeFileSync(tempFilePath, buffer);
+    
+//     // Print the PDF using system default printer
+//     await shell.openPath(tempFilePath);
+    
+//     // Clean up temp file after a delay
+//     setTimeout(() => {
+//       try {
+//         fs.unlinkSync(tempFilePath);
+//       } catch (err) {
+//         console.log('Could not delete temp file:', err);
+//       }
+//     }, 10000);
+    
+//     return { success: true };
+//   } catch (error) {
+//     console.error('Print error:', error);
+//     return { success: false, error: error.message };
+//   }
+// });
 ipcMain.handle('print-pdf', async (event, pdfData) => {
   try {
     // Create temp file
@@ -2524,17 +2554,54 @@ ipcMain.handle('print-pdf', async (event, pdfData) => {
     // Write PDF data to temp file
     fs.writeFileSync(tempFilePath, buffer);
     
-    // Print the PDF using system default printer
-    await shell.openPath(tempFilePath);
+    // Print silently using system commands
+    const platform = process.platform;
+    
+    if (platform === 'win32') {
+      // Windows: Use PowerShell to print silently
+      try {
+        execSync(`powershell -Command "Start-Process -FilePath '${tempFilePath}' -Verb Print -WindowStyle Hidden"`, { 
+          timeout: 10000,
+          stdio: 'ignore'
+        });
+      } catch (error) {
+        console.log('PowerShell print failed, trying alternative:', error.message);
+        // Alternative: Use Windows print command
+        try {
+          execSync(`print "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
+        } catch (altError) {
+          // Final fallback: open file (may show print dialog)
+          await shell.openPath(tempFilePath);
+        }
+      }
+    } else if (platform === 'darwin') {
+      // macOS: Use lpr command for silent printing
+      try {
+        execSync(`lpr "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
+      } catch (error) {
+        console.log('lpr failed:', error.message);
+        await shell.openPath(tempFilePath);
+      }
+    } else {
+      // Linux: Use lpr command
+      try {
+        execSync(`lpr "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
+      } catch (error) {
+        console.log('lpr failed:', error.message);
+        await shell.openPath(tempFilePath);
+      }
+    }
     
     // Clean up temp file after a delay
     setTimeout(() => {
       try {
-        fs.unlinkSync(tempFilePath);
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
       } catch (err) {
         console.log('Could not delete temp file:', err);
       }
-    }, 10000);
+    }, 15000);
     
     return { success: true };
   } catch (error) {
