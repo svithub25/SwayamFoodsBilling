@@ -116,6 +116,8 @@ getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-paym
   getExportInventoryData: () => ipcRenderer.invoke('get-export-inventory-data'),
     getExportSalesData: (startDate, endDate) => ipcRenderer.invoke('get-export-sales-data', startDate, endDate),
       getExportPurchaseData: (startDate, endDate) => ipcRenderer.invoke('get-export-purchase-data', startDate, endDate),
+    
+getNextSku: () => ipcRenderer.invoke('get-next-sku'),
 // ...existing code...
 getSalesmanCommission: () => ipcRenderer.invoke('get-Salesman-Commission'),
 // ...existing code...
@@ -124,6 +126,7 @@ getSalesmanCommission: () => ipcRenderer.invoke('get-Salesman-Commission'),
 //closing stock 
   updateClosingStock: (data) => ipcRenderer.invoke('update-closing-stock', data),
   getClosingStock: (itemId) => ipcRenderer.invoke('get-closing-stock', itemId),
+  
 
 
 

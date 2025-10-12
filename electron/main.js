@@ -2609,3 +2609,48 @@ ipcMain.handle('print-pdf', async (event, pdfData) => {
     return { success: false, error: error.message };
   }
 });
+
+
+// Add this function after the database initialization
+function getNextSku() {
+  try {
+    // Get all SKUs that are pure numbers (not custom like "food101")
+    const numericSkus = db.prepare(`
+      SELECT sku FROM items 
+      WHERE (status_code = 0 OR status_code IS NULL) 
+      AND sku GLOB '[0-9]*' 
+      AND sku = CAST(sku AS INTEGER)
+      ORDER BY CAST(sku AS INTEGER) DESC
+    `).all();
+
+    if (numericSkus.length === 0) {
+      return '1'; // Start from 1 if no numeric SKUs exist
+    }
+
+    // Find the highest numeric SKU
+    const highestSku = Math.max(...numericSkus.map(item => parseInt(item.sku, 10)));
+    
+    // Find gaps in the sequence
+    for (let i = 1; i <= highestSku; i++) {
+      const exists = db.prepare(`
+        SELECT id FROM items 
+        WHERE sku = ? AND (status_code = 0 OR status_code IS NULL)
+      `).get(i.toString());
+      
+      if (!exists) {
+        return i.toString(); // Return the first gap found
+      }
+    }
+    
+    // No gaps found, return next number
+    return (highestSku + 1).toString();
+  } catch (error) {
+    console.error('Error generating SKU:', error);
+    return '1';
+  }
+}
+
+// Add IPC handler for getting next SKU
+ipcMain.handle('get-next-sku', async () => {
+  return getNextSku();
+});

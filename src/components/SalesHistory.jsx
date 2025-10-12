@@ -6,11 +6,11 @@ import {
   Filter, 
   Calendar,
   User,
-  Package,
+  Package, 
   Eye,
   RefreshCw,
   Trash2,
-  Minus 
+  Minus  
   
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -67,7 +67,7 @@ const SalesHistory = () => {
         const inventory = await window.electronAPI.getInventory();
         setItems(inventory);
       } else {
-        // Mock items for web environment
+        // Mock items for web environment 
         setItems([
           { id: 1, name: 'Pen' },
           { id: 2, name: 'Notebook' }

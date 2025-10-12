@@ -174,22 +174,22 @@ const Admin = () => {
     return errors;
   };
 
-  const buildProductPayload = (form) => ({
-    name: String(form.name).trim(),
-    sku: String(form.sku).trim(),
-    hsn_code: String(form.hsn_code || '').trim(),
-    description: String(form.description || '').trim(),
-    unit: String(form.unit),
-    mrp: Math.max(0, parseFloat(form.mrp) || 0),
-    purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
-    sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
-    customer_rate: Math.max(0, parseFloat(form.customer_rate) || 0),
-    salesman_rate: Math.max(0, parseFloat(form.salesman_rate) || 0),
-    gst_percentage: parseFloat(form.gst_percentage) || 0,
-    category_id: parseInt(form.category_id, 10),
-    current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
-    minimum_stock: Math.max(0, parseInt(form.minimum_stock, 10) || 0)
-  });
+const buildProductPayload = (form) => ({
+  name: String(form.name).trim(),
+  sku: String(form.sku).trim() || getNextSku(), // Fallback to auto-generated if empty
+  hsn_code: String(form.hsn_code || '').trim(),
+  description: String(form.description || '').trim(),
+  unit: String(form.unit),
+  mrp: Math.max(0, parseFloat(form.mrp) || 0),
+  purchase_rate: Math.max(0, parseFloat(form.purchase_rate) || 0),
+  sale_rate: Math.max(0, parseFloat(form.sale_rate) || 0),
+  customer_rate: Math.max(0, parseFloat(form.customer_rate) || 0),
+  salesman_rate: Math.max(0, parseFloat(form.salesman_rate) || 0),
+  gst_percentage: parseFloat(form.gst_percentage) || 0,
+  category_id: parseInt(form.category_id, 10),
+  current_stock: Math.max(0, parseInt(form.current_stock, 10) || 0),
+  minimum_stock: Math.max(0, parseInt(form.minimum_stock, 10) || 0)
+});
 
 
 
@@ -646,6 +646,23 @@ const Admin = () => {
     { id: 'customers', name: 'Customers', icon: Users } // NEW: Customers tab
   ];
 
+  useEffect(() => {
+    // Auto-generate SKU when product form is opened for new product
+    if (showProductForm && !editingItem) {
+      const generateSku = async () => {
+        try {
+          const nextSku = await window.electronAPI.getNextSku();
+          setProductForm(prev => ({ ...prev, sku: nextSku }));
+        } catch (error) {
+          console.error('Error generating SKU:', error);
+        }
+      };
+      generateSku();
+    }
+  }, [showProductForm, editingItem]);
+
+
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -743,8 +760,9 @@ const Admin = () => {
                   <h2 className="text-lg font-semibold">Product Management</h2>
                   <button
                     onClick={() => {
-                      setProductForm(initialProductForm); // <-- Reset product form
+                      setProductForm(initialProductForm);
                       setShowProductForm(true);
+                      // Auto-generate SKU will be handled by useEffect
                     }}
                     className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
                   >
@@ -759,8 +777,8 @@ const Admin = () => {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Rate</th>
+                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MRP</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sale Rate</th> */}
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Rate</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman Rate</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST%</th>
@@ -784,12 +802,12 @@ const Admin = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                               {product.sku}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               ₹{product.mrp}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               ₹{product.sale_rate}
-                            </td>
+                            </td> */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           ₹{product.customer_rate}
                         </td>
@@ -1270,20 +1288,43 @@ const Admin = () => {
                   {productErrors.name && <p className="text-red-600 text-xs mt-1">{productErrors.name}</p>}
                 </div>
 
-                {/* SKU */}
+                {/* SKU - Updated with auto-generation */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SKU</label>
-                  <input
-                    type="text"
-                    value={productForm.sku}
-                    onChange={(e) => {
-                      const upper = e.target.value.toUpperCase();
-                      setProductForm({ ...productForm, sku: upper });
-                      if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
-                    }}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${productErrors.sku ? 'border-red-500' : 'border-gray-300'
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SKU
+                    <span className="text-xs text-gray-500 ml-1">(Auto-generated or custom)</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={productForm.sku}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        setProductForm({ ...productForm, sku: value });
+                        if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
+                      }}
+                      className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                        productErrors.sku ? 'border-red-500' : 'border-gray-300'
                       }`}
-                  />
+                      placeholder="Auto-generated or enter custom"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const nextSku = await window.electronAPI.getNextSku();
+                          setProductForm({ ...productForm, sku: nextSku });
+                          if (productErrors.sku) setProductErrors({ ...productErrors, sku: undefined });
+                        } catch (error) {
+                          console.error('Error generating SKU:', error);
+                        }
+                      }}
+                      className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+                      title="Generate next SKU"
+                    >
+                      Auto
+                    </button>
+                  </div>
                   {productErrors.sku && <p className="text-red-600 text-xs mt-1">{productErrors.sku}</p>}
                 </div>
 

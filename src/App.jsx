@@ -17,9 +17,9 @@ import Billing from "./components/Billing";
 import SalesHistory from "./components/SalesHistory";
 import Ledger from "./components/Ledger";
 import Export from "./components/Export"; 
-import Backup from "./components/Backup"; 
+import Backup from "./components/Backup";
 import ComingSoon from "./components/ComingSoon";
-import Analytics from "./components/Analytics";
+import Analytics from "./components/Analytics"; 
 import Admin from "./components/Admin";
 import ItemDetails from "./components/ItemDetails";
 import PurchaseDetails from "./components/PurchaseDetails";
@@ -28,8 +28,10 @@ import PurchaseOrder from "./components/PurchaseOrder";
 import Layout from "./components/Layout";
 import ShortcutHelp from "./components/ShortcutHelp";
 import PurchaseEdit from "./components/PurchaseEdit";
-import SaleEdit from "./components/SaleEdit";
+import SaleEdit from "./components/SaleEdit"; 
 import Contactus from "./components/Contactus"; 
+import SalesmanCommission from "./components/SalesmanCommission";
+
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
@@ -91,28 +93,29 @@ const App = () => {
   return (
     <>
       <Layout user={user} onLogout={handleLogout}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/purchase" element={<Purchase />} />
-          <Route path="/billing" element={<Billing />} />
-          <Route path="/sales-history" element={<SalesHistory />} />
-          <Route path="/ledger" element={<Ledger />} />
-          <Route path="/export" element={<Export />} />
-          <Route path="/backup" element={<Backup />} />  
-          <Route path="/analytics" element={<Analytics />} />  
-           {/* <Route path="/analytics" element={<ComingSoon />} />  */}
-          <Route path="/admin" element={<Admin />} /> 
-          <Route path="/item/:id" element={<ItemDetails />} />
-          <Route path="/purchase/:id" element={<PurchaseDetails />} />
-           <Route path="/purchaseupdate/:id" element={<PurchaseEdit />} />
-          <Route path="/sale/:id" element={<SaleDetails />} />
-          <Route path="/saleedit/:id" element={<SaleEdit />} />
-          <Route path="/purchase-order" element={<PurchaseOrder />} />
-          <Route path="/contact" element={<Contactus />} />
-        </Routes> 
-      </Layout>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/purchase" element={<Purchase />} />
+                <Route path="/billing" element={<Billing />} />
+                <Route path="/sales-history" element={<SalesHistory />} />
+                <Route path="/salesman-commission" element={<SalesmanCommission />} />
+                <Route path="/ledger" element={<Ledger />} />
+                <Route path="/export" element={<Export />} />
+                <Route path="/backup" element={<Backup />} />  
+                <Route path="/analytics" element={<Analytics />} />  
+                 {/* <Route path="/analytics" element={<ComingSoon />} />  */}
+                <Route path="/admin" element={<Admin />} /> 
+                <Route path="/item/:id" element={<ItemDetails />} />
+                <Route path="/purchase/:id" element={<PurchaseDetails />} />
+                 <Route path="/purchaseupdate/:id" element={<PurchaseEdit />} />
+                <Route path="/sale/:id" element={<SaleDetails />} />
+                <Route path="/saleedit/:id" element={<SaleEdit />} />
+                <Route path="/purchase-order" element={<PurchaseOrder />} />
+                <Route path="/contact" element={<Contactus />} />
+              </Routes> 
+            </Layout>
 
       {showShortcutHelp && (
         <ShortcutHelp onClose={() => setShowShortcutHelp(false)} />

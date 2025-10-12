@@ -449,6 +449,53 @@ const Billing = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Items List */}
         <div className="lg:col-span-2 space-y-6">
+
+
+           {/* Search */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search items... (Ctrl+K to focus, Enter/Tab to add)"
+                value={searchTerm}
+                onChange={e => {
+                  setSearchTerm(e.target.value);
+                  setSearchDropdown(true);
+                  setSearchIndex(0);
+                }}
+                onFocus={() => setSearchDropdown(true)}
+                onBlur={() => setTimeout(() => setSearchDropdown(false), 100)}
+                onKeyDown={handleSearchKeyDown}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                tabIndex={0}
+                autoComplete="off"
+              />
+              {searchDropdown && filteredItems.length > 0 && (
+                <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
+                  {filteredItems.map((item, idx) => (
+                    <li
+                      key={item.id}
+                      className={`px-3 py-2 cursor-pointer ${idx === searchIndex ? 'bg-blue-100' : ''}`}
+                      onMouseDown={() => {
+                        addToCart(item);
+                        setSearchTerm('');
+                        setSearchDropdown(false);
+                        setSearchIndex(0);
+                      }}
+                      tabIndex={-1}
+                    >
+                      {item.name} 
+                      <span className="text-xs text-gray-400 ml-2">
+                        (Stock: {item.current_stock}, Rate: ₹{isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
           {/* Customer Information */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -620,51 +667,7 @@ const Billing = () => {
             />
           </div>
 
-          {/* Search */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search items... (Ctrl+K to focus, Enter/Tab to add)"
-                value={searchTerm}
-                onChange={e => {
-                  setSearchTerm(e.target.value);
-                  setSearchDropdown(true);
-                  setSearchIndex(0);
-                }}
-                onFocus={() => setSearchDropdown(true)}
-                onBlur={() => setTimeout(() => setSearchDropdown(false), 100)}
-                onKeyDown={handleSearchKeyDown}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                tabIndex={0}
-                autoComplete="off"
-              />
-              {searchDropdown && filteredItems.length > 0 && (
-                <ul className="absolute z-50 bg-white border border-gray-200 rounded shadow max-h-40 overflow-y-auto w-full mt-1">
-                  {filteredItems.map((item, idx) => (
-                    <li
-                      key={item.id}
-                      className={`px-3 py-2 cursor-pointer ${idx === searchIndex ? 'bg-blue-100' : ''}`}
-                      onMouseDown={() => {
-                        addToCart(item);
-                        setSearchTerm('');
-                        setSearchDropdown(false);
-                        setSearchIndex(0);
-                      }}
-                      tabIndex={-1}
-                    >
-                      {item.name} 
-                      <span className="text-xs text-gray-400 ml-2">
-                        (Stock: {item.current_stock}, Rate: ₹{isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate})
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+         
         </div>
 
         {/* Cart */}
@@ -793,7 +796,7 @@ const Billing = () => {
 
                 {/* Action Buttons */}
                 <div className="space-y-2 mt-4">
-                  <button 
+                  <button
                     onClick={() => completeSale('complete')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
@@ -801,7 +804,7 @@ const Billing = () => {
                     <Save className="w-4 h-4 mr-2" />
                     Complete Sale (Ctrl+C)
                   </button>
-                  <button
+                  <button 
                     onClick={() => completeSale('print')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
