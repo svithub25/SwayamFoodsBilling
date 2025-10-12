@@ -274,17 +274,15 @@ const Billing = () => {
 
       const saleItems = filteredCart.map(item => {
         const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
-        const origItem = items.find(i => i.id === item.id); // <-- Define origItem here
-        return {
+        return { 
           id: item.id,
           quantity: parseInt(item.quantity),
-          unit_price: item.unit_price,
+          unit_price: item.unit_price, 
           gst_percentage: item.gst_percentage,
-          total_price: totalAmount,
-          customer_rate: origItem?.customer_rate ?? item.unit_price,   // <-- Add customer_rate
-          salesman_rate: origItem?.salesman_rate ?? item.unit_price    // <-- Add salesman_rate
+          total_price: totalAmount
         };
       });
+      
       const saleData = {
         bill_number: billNumber,
         customer_name: customerInfo.name || null,
@@ -297,95 +295,103 @@ const Billing = () => {
         total_amount: getFinalTotal(),
         rounding_off: getRoundingOff(),
         salesman_id: selectedSalesman || null,
-        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer') // <-- updated line
+        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')
       };
+      
       if (window.electronAPI) {
         await window.electronAPI.saveSale(saleData);
         console.log('saleData:', saleData);
       }
 
-      // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
-      // --- PDF GENERATION: Do this BEFORE resetting cart/bill/customer ---
-      if (action === 'pdf') {
+      // --- PDF/PRINT GENERATION: Do this BEFORE resetting cart/bill/customer ---
+      if (action === 'pdf' || action === 'print') {
         try {
           const pdfContainer = document.createElement('div');
           pdfContainer.style.position = 'fixed';
           pdfContainer.style.left = '-9999px';
           pdfContainer.style.top = '0';
-          pdfContainer.style.width = '210mm';
+          pdfContainer.style.width = '210mm'; // Keep A4 width
           pdfContainer.style.zIndex = '-1';
           document.body.appendChild(pdfContainer);
-         
 
-          import('react-dom/client').then(({ createRoot }) => {
-            const root = createRoot(pdfContainer);
-            root.render(
-             <BillPDF
-  billNumber={billNumber}
-  customer={customerInfo}
-  items={cart.map(item => ({
-    hsn_code: item.hsn_code,
-    sku: item.sku,
-    name: item.name,
-    quantity: parseInt(item.quantity) || 0,
-    unit_price: item.unit_price
-  }))}
-  discount={discount}
-  subtotal={getSubtotal()}
-  roundingOff={getRoundingOff()}
-  total={getFinalTotal()}
-  sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
-  salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-  salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
- || ""}
-  salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
-  note={billNarration}
-/>
-            );
+          const { createRoot } = await import('react-dom/client');
+          const root = createRoot(pdfContainer);
+          
+          root.render(
+            <BillPDF
+              billNumber={billNumber}
+              customer={customerInfo}
+              items={cart.map(item => ({
+                hsn_code: item.hsn_code,
+                sku: item.sku,
+                name: item.name,
+                quantity: parseInt(item.quantity) || 0,
+                unit_price: item.unit_price
+              }))}
+              discount={discount}
+              subtotal={getSubtotal()}
+              roundingOff={getRoundingOff()}
+              total={getFinalTotal()}
+              sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
+              salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
+              salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info || ""}
+              salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
+              note={billNarration}
+            />
+          );
 
-            setTimeout(async () => {
-              const pdf = new jsPDF({ 
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
+          setTimeout(async () => {
+            const pdf = new jsPDF({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: 'a4' // Keep A4 for both print and PDF
+            });
+
+            const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+
+            for (let i = 0; i < pageElements.length; i++) {
+              if (i > 0) pdf.addPage(); 
+
+              const canvas = await html2canvas(pageElements[i], {
+                scale: 1.5,
+                useCORS: true,
+                allowTaint: true,
+                width: 794, // A4 width
+                height: 1123, // A4 height
+                backgroundColor: '#ffffff'
               });
 
-              // Find all page divs with proper selector
-              const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
+              const imgData = canvas.toDataURL('image/png');
+              const pageWidth = pdf.internal.pageSize.getWidth();
+              const pageHeight = pdf.internal.pageSize.getHeight();
+              pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+            }
 
-              for (let i = 0; i < pageElements.length; i++) {
-                if (i > 0) {
-                  pdf.addPage();
-                }
-
-                const canvas = await html2canvas(pageElements[i], {
-                  scale: 1.5,
-                  useCORS: true,
-                  allowTaint: true,
-                  width: 794, // A4 width in pixels at 96 DPI
-                  height: 1123, // A4 height in pixels at 96 DPI
-                  backgroundColor: '#ffffff'
-                });
-
-                const imgData = canvas.toDataURL('image/png');
-                const pageWidth = pdf.internal.pageSize.getWidth();
-                const pageHeight = pdf.internal.pageSize.getHeight();
-
-                // Add image to fill the entire page
-                pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+            if (action === 'print') {
+              // Send to printer
+              const pdfOutput = pdf.output('arraybuffer');
+              const result = await window.electronAPI.printPdf(pdfOutput);
+              
+              if (result.success) {
+                toast.success('Invoice sent to printer!');
+              } else {
+                toast.error('Failed to print: ' + result.error);
               }
-
+            } else {
+              // Download PDF
               pdf.save(`Invoice_${billNumber}.pdf`);
-              root.unmount();
-              document.body.removeChild(pdfContainer);
               toast.success('PDF generated and downloaded!');
-            }, 1000);
-          });
+            }
+
+            // Cleanup
+            root.unmount();
+            document.body.removeChild(pdfContainer);
+          }, 1000);
         } catch (err) {
-          toast.error('Error generating PDF');
+          toast.error('Error generating PDF/Print');
         }
       }
-      // --- END PDF GENERATION ---
+      // --- END PDF/PRINT GENERATION ---
 
       // Now reset form
       setLastSaleData({
@@ -408,7 +414,7 @@ const Billing = () => {
       await generateBillNumber();
       await loadItems();
       toast.success('Sale completed successfully!');
-       fetchCustomers();
+      fetchCustomers();
     } catch (error) {
       console.error('Error completing sale:', error);
       toast.error('Error completing sale');
@@ -520,21 +526,19 @@ const completeSaleData = async () => {
   // Check stock and customer validation...
   // (Copy the validation logic from your completeSale function)
   
-  const saleItems = filteredCart.map(item => {
+  const saleItems = filteredCart.map (item => {
     const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
     const origItem = items.find(i => i.id === item.id);
     return {
       id: item.id,
       quantity: parseInt(item.quantity),
-      unit_price: item.unit_price,
+      unit_price: item.unit_price, 
       gst_percentage: item.gst_percentage,
-      total_price: totalAmount,
-      customer_rate: origItem?.customer_rate ?? item.unit_price,
-      salesman_rate: origItem?.salesman_rate ?? item.unit_price
+      total_price: totalAmount
     };
-  });
+  }); 
 
-  const saleData = {
+  const saleData = { 
     bill_number: billNumber,
     customer_name: customerInfo.name || null,
     customer_contact: customerInfo.contact || null,
@@ -1028,11 +1032,11 @@ const completeSaleData = async () => {
                     <Save className="w-4 h-4 mr-2" />
                     Complete Sale (Ctrl+C)
                   </button>
-                  <button
-                    onClick={handlePrintSale}
+                 <button
+                    onClick={() => completeSale('print')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
-                  >
+                  > 
                     <Printer className="w-4 h-4 mr-2" />
                     Complete & Print
                   </button>
@@ -1041,7 +1045,7 @@ const completeSaleData = async () => {
                     className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                    <Download className="w-4 h-4 mr-2" /> 
                     Complete & Generate PDF
                   </button>
                   <button
@@ -1130,5 +1134,4 @@ const completeSaleData = async () => {
     </div>
   );
 };
-
 export default Billing;

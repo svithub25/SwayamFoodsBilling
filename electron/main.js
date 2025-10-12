@@ -800,6 +800,11 @@ ipcMain.handle('save-sale', async (event, saleData) => {
   const updateStockStmt = db.prepare('UPDATE items SET current_stock = current_stock - ? WHERE id = ?');
 
   items.forEach(item => {
+    // Fetch rates from items table if not provided
+    const itemRates = db.prepare('SELECT customer_rate, salesman_rate FROM items WHERE id = ?').get(item.id);
+    const customerRate = typeof item.customer_rate !== 'undefined' ? item.customer_rate : itemRates?.customer_rate || 0;
+    const salesmanRate = typeof item.salesman_rate !== 'undefined' ? item.salesman_rate : itemRates?.salesman_rate || 0;
+
     saleItemStmt.run(
       saleId,
       item.id,
@@ -807,12 +812,12 @@ ipcMain.handle('save-sale', async (event, saleData) => {
       item.unit_price,
       item.total_price,
       sale_type || 'customer',
-      item.customer_rate,      // <-- Save customer_rate
-      item.salesman_rate       // <-- Save salesman_rate
+      customerRate,
+      salesmanRate
     );
     updateStockStmt.run(item.quantity, item.id);
 
-     reduceClosingStock(item.id, item.quantity);
+    reduceClosingStock(item.id, item.quantity);
   });
 
   return { success: true, saleId };
@@ -910,22 +915,39 @@ ipcMain.handle('get-purchase-full-details', async (event, purchaseId) => {
 });
 
 ipcMain.handle('get-sale-details', async (event, saleId) => {
-  const sale = db.prepare(`
-    SELECT s.*, sm.name as salesman_name, COUNT(si.id) as item_count FROM sales s
-    LEFT JOIN sale_items si ON s.id = si.sale_id
-    LEFT OUTER JOIN salesman sm ON s.salesman_id = sm.id
-    WHERE s.id = ?
-    GROUP BY s.id
-  `).get(saleId);
+  try {
+    // Get sale details
+    const sale = db.prepare(`
+      SELECT s.*, sm.name as salesman_name, sm.contact_info as salesman_contact, sm.address as salesman_address
+      FROM sales s
+      LEFT JOIN salesman sm ON s.salesman_id = sm.id
+      WHERE s.id = ?
+    `).get(saleId);
 
-  const items = db.prepare(`
-    SELECT si.*, i.name as item_name, i.sku, i.hsn_code, i.unit
-    FROM sale_items si
-    LEFT JOIN items i ON si.item_id = i.id
-    WHERE si.sale_id = ? 
-  `).all(saleId);
+    if (!sale) {
+      throw new Error('Sale not found');
+    }
 
-  return { ...sale, items };
+    // Get sale items
+    const items = db.prepare(`
+      SELECT si.*, i.name as item_name, i.hsn_code, i.sku , i.current_stock
+      FROM sale_items si
+      LEFT JOIN items i ON si.item_id = i.id
+      WHERE si.sale_id = ?
+      AND (si.status_code = 0 OR si.status_code IS NULL)
+    `).all(saleId);
+
+    return {
+      ...sale,
+      salesman: sale.salesman_name,
+      salesman_contact_info: sale.salesman_contact,
+      salesman_address: sale.salesman_address,
+      items
+    };
+  } catch (error) {
+    console.error('Error getting sale details:', error);
+    throw error;
+  }
 });
 
 ipcMain.handle('generate-purchase-order-pdf', async (event, orderData) => {
@@ -1527,8 +1549,6 @@ ipcMain.handle('update-purchase', async (event, purchaseId, updatedPurchase) => 
 
   return { success: true };
 });
-
-// Update sale handler
 ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
   // 1. Fetch old sale items
   const oldItems = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(saleId);
@@ -1573,7 +1593,8 @@ ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
       discount = ?, 
       total_amount = ?,
       rounding_off = ?,
-      salesman_id = ?
+      salesman_id = ?,
+      sale_type = ?
     WHERE id = ?
   `).run(
     updatedSale.customer_name,
@@ -1584,28 +1605,44 @@ ipcMain.handle('update-sale', async (event, saleId, updatedSale) => {
     updatedSale.discount,
     updatedSale.total_amount,
     updatedSale.rounding_off,
-    updatedSale.salesman_id || null,  // <-- add this line
+    updatedSale.salesman_id || null,
+    updatedSale.sale_type || 'customer',
     saleId
   );
 
-  // 5. Remove old sale_items and insert new ones
+  // 5. Remove old sale_items and insert new ones with preserved rates
   db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(saleId);
 
   const saleItemStmt = db.prepare(`
     INSERT INTO sale_items 
-      (sale_id, item_id, quantity, unit_price, total_price)
-    VALUES (?, ?, ?, ?, ?)
+      (sale_id, item_id, quantity, unit_price, total_price, sale_type, customer_rate, salesman_rate)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   updatedSale.items.forEach(item => {
+    // Preserve rates from the original sale item or fetch from items table
+    const oldItem = oldMap[item.id];
+    let customerRate = oldItem?.customer_rate;
+    let salesmanRate = oldItem?.salesman_rate;
+    
+    // If rates don't exist in old item, fetch from items table
+    if (!customerRate || !salesmanRate) {
+      const itemRates = db.prepare('SELECT customer_rate, salesman_rate FROM items WHERE id = ?').get(item.id);
+      customerRate = customerRate || itemRates?.customer_rate || 0;
+      salesmanRate = salesmanRate || itemRates?.salesman_rate || 0;
+    }
+
     saleItemStmt.run(
       saleId,
       item.id,
       parseFloat(item.quantity),
       parseFloat(item.unit_price),
-      parseFloat(item.total_price)
+      parseFloat(item.total_price),
+      updatedSale.sale_type || 'customer',
+      customerRate,
+      salesmanRate 
     );
-     reduceClosingStock(item.id, parseFloat(item.quantity));
+    reduceClosingStock(item.id, parseFloat(item.quantity));
   });
 
   return { success: true };
@@ -2554,54 +2591,17 @@ ipcMain.handle('print-pdf', async (event, pdfData) => {
     // Write PDF data to temp file
     fs.writeFileSync(tempFilePath, buffer);
     
-    // Print silently using system commands
-    const platform = process.platform;
-    
-    if (platform === 'win32') {
-      // Windows: Use PowerShell to print silently
-      try {
-        execSync(`powershell -Command "Start-Process -FilePath '${tempFilePath}' -Verb Print -WindowStyle Hidden"`, { 
-          timeout: 10000,
-          stdio: 'ignore'
-        });
-      } catch (error) {
-        console.log('PowerShell print failed, trying alternative:', error.message);
-        // Alternative: Use Windows print command
-        try {
-          execSync(`print "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
-        } catch (altError) {
-          // Final fallback: open file (may show print dialog)
-          await shell.openPath(tempFilePath);
-        }
-      }
-    } else if (platform === 'darwin') {
-      // macOS: Use lpr command for silent printing
-      try {
-        execSync(`lpr "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
-      } catch (error) {
-        console.log('lpr failed:', error.message);
-        await shell.openPath(tempFilePath);
-      }
-    } else {
-      // Linux: Use lpr command
-      try {
-        execSync(`lpr "${tempFilePath}"`, { timeout: 10000, stdio: 'ignore' });
-      } catch (error) {
-        console.log('lpr failed:', error.message);
-        await shell.openPath(tempFilePath);
-      }
-    }
+    // Print the PDF using system default printer
+    await shell.openPath(tempFilePath);
     
     // Clean up temp file after a delay
     setTimeout(() => {
       try {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-        }
+        fs.unlinkSync(tempFilePath);
       } catch (err) {
         console.log('Could not delete temp file:', err);
       }
-    }, 15000);
+    }, 10000);
     
     return { success: true };
   } catch (error) {

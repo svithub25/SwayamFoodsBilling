@@ -78,6 +78,7 @@ const SaleEdit = () => {
     setLoading(true);
     try {
       const result = await window.electronAPI.getSaleDetails(parseInt(id));
+      console.log('Fetched sale details:', result);  
       setSale(result); 
       setForm({
         bill_number: result.bill_number,
@@ -249,14 +250,32 @@ const filteredItems = items.filter(i =>
       toast.error('Please enter at least one valid item');
       return;
     }
+
+    // --- STOCK VALIDATION ---
+    for (const item of validItems) {
+      const stockItem = items.find(i => i.id === item.id);
+      // Find the original quantity from the loaded sale
+      const originalSaleItem = sale?.items?.find(si => si.item_id === item.id);
+      const originalQty = originalSaleItem ? parseInt(originalSaleItem.quantity) : 0;
+      const maxAllowedQty = (stockItem?.current_stock || 0) + originalQty;
+
+      if (parseInt(item.quantity) > maxAllowedQty) {
+        toast.error(
+          `Insufficient stock for ${item.name}. Available for sale: ${maxAllowedQty} (Current stock: ${stockItem?.current_stock || 0}, Previously sold: ${originalQty})`
+        );
+        return;
+      }
+    }
+    // --- END STOCK VALIDATION ---
+
     try {
       await window.electronAPI.updateSale(parseInt(id), {
-        ...form,
+        ...form, 
         items: form.items,
         total_amount: getFinalAmount(),
         rounding_off: getRoundingOff(),
         salesman_id: selectedSalesman || null,
-        sale_type: isSalesmanCustomer ? 'salesman' : 'customer'
+         sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer') 
       });
       toast.success('Sale updated successfully!');
       navigate('/sales-history');
