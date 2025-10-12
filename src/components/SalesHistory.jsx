@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Trash2,
   Minus 
+  
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -29,6 +30,7 @@ const SalesHistory = () => {
     item: '',
     salesman: '',
     billNumber: ''
+    
   });
   const [items, setItems] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
@@ -115,13 +117,11 @@ const SalesHistory = () => {
   useEffect(() => {
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
-      // Only call API for filters that need backend processing
+      // Only call API for date filters (which need backend processing)
       const backendFilters = {
         startDate: filters.startDate,
-        endDate: filters.endDate,
-        item: filters.item,
-        salesman: filters.salesman
-        // Exclude billNumber and customer - they're filtered on frontend
+        endDate: filters.endDate
+        // Remove item and salesman - they're filtered on frontend only
       };
       
       // Only make API call if backend filters have values
@@ -132,11 +132,11 @@ const SalesHistory = () => {
         // If no backend filters, just load all sales
         loadSalesHistory();
       }
-    }, 300);
+    }, 300); 
     
     return () => clearTimeout(debounceTimeout.current);
     // eslint-disable-next-line
-  }, [filters.startDate, filters.endDate, filters.item, filters.salesman]); // Only watch backend filter fields
+  }, [filters.startDate, filters.endDate]); // Only watch date fields
 
   const loadSalesHistory = async () => {
     try {
@@ -158,16 +158,17 @@ const SalesHistory = () => {
       setLoading(false);
     }  
   };
- 
-const clearFilters = () => {
+ const clearFilters = () => {
   setFilters({
     startDate: '',
-    endDate: '',
+    endDate: '', 
     customer: '',
     item: '', 
     salesman: '',
-    billNumber: '' // Add this
+    billNumber: ''
   });
+  // Reload all sales when filters are cleared
+  loadSalesHistory();
 };
 
   const viewSaleDetails = (saleId) => {
@@ -225,8 +226,9 @@ const clearFilters = () => {
 
     import('react-dom/client').then(({ createRoot }) => {
       const root = createRoot(pdfContainer);
+      
       root.render(
-        <BillPDF
+        <BillPDF 
           billNumber={saleDetails.bill_number}
           customer={{
             name: saleDetails.customer_name,
@@ -416,17 +418,19 @@ const clearFilters = () => {
   };
 
   const filteredSales = sales.filter(sale => {
-    const matchStartDate = !filters.startDate || new Date(sale.sale_date) >= new Date(filters.startDate);
-    const matchEndDate = !filters.endDate || new Date(sale.sale_date) <= new Date(filters.endDate);
-    const matchCustomer = !filters.customer || (sale.customer_name && sale.customer_name.toLowerCase().includes(filters.customer.toLowerCase()));
-    const matchItem = !filters.item || (sale.items && sale.items.some(i => i.item_name.toLowerCase().includes(filters.item.toLowerCase())));
-    const matchSalesman = !filters.salesman || sale.salesman_id === filters.salesman;
-    const matchBill =
-      !filters.billNumber ||
-      sale.bill_number.toLowerCase().includes(filters.billNumber.toLowerCase());
+  const matchStartDate = !filters.startDate || new Date(sale.sale_date) >= new Date(filters.startDate);
+  const matchEndDate = !filters.endDate || new Date(sale.sale_date) <= new Date(filters.endDate);
+  const matchCustomer = !filters.customer || (sale.customer_name && sale.customer_name.toLowerCase().includes(filters.customer.toLowerCase()));
+  
+  // Simple item filtering - if you have item_names field from backend
+  const matchItem = !filters.item || 
+    (sale.item_names && sale.item_names.toLowerCase().includes(filters.item.toLowerCase()));
+  
+  const matchSalesman = !filters.salesman || String(sale.salesman_id) === String(filters.salesman);
+  const matchBill = !filters.billNumber || sale.bill_number.toLowerCase().includes(filters.billNumber.toLowerCase());
 
-    return matchStartDate && matchEndDate && matchCustomer && matchItem && matchSalesman && matchBill;
-  });
+  return matchStartDate && matchEndDate && matchCustomer && matchItem && matchSalesman && matchBill;
+});
 
   if (loading) {
     return (

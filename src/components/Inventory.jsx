@@ -63,7 +63,7 @@ const Inventory = () => {
     (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const lowStockItems = items.filter(item => item.current_stock <= item.minimum_stock);
+  const lowStockItems = items.filter(item => item.current_stock < item.minimum_stock);
 
   if (loading) {
     return (
@@ -193,11 +193,11 @@ const Inventory = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredItems.map((item) => (
-                <tr key={item.id} className={item.current_stock <= item.minimum_stock ? 'bg-red-50' : ''}>
+                <tr key={item.id} className={item.current_stock < item.minimum_stock ? 'bg-red-50' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                      {item.current_stock <= item.minimum_stock && (
+                      {item.current_stock < item.minimum_stock && (
                         <AlertTriangle className="w-4 h-4 text-red-500 ml-2" />
                       )}
                     </div>
@@ -205,12 +205,12 @@ const Inventory = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-600">{item.sku}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap"> 
                     <span className="text-sm text-gray-600">{item.category_name}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`text-sm font-medium ${
-                      item.current_stock <= item.minimum_stock ? 'text-red-600' : 'text-gray-900'
+                      item.current_stock < item.minimum_stock ? 'text-red-600' : 'text-gray-900'
                     }`}>
                       {item.current_stock}
                     </span>

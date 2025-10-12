@@ -1,4 +1,4 @@
-import { Download, FileText, Plus, History, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User, SendHorizontal } from 'lucide-react';
+import { Download, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User, SendHorizontal } from 'lucide-react';
 import { useHotkeys } from "react-hotkeys-hook";
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -15,9 +15,6 @@ const Billing = () => {
   const [searchIndex, setSearchIndex] = useState(0);
   const [discount, setDiscount] = useState(0);
   const [billNumber, setBillNumber] = useState('');
-  const [showItemHistory, setShowItemHistory] = useState(null);
-  const [itemHistory, setItemHistory] = useState([]);
-  const [lastSaleData, setLastSaleData] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
   const [selectedSalesman, setSelectedSalesman] = useState('');
   const [billNarration, setBillNarration] = useState('');
@@ -26,10 +23,11 @@ const Billing = () => {
   const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
   const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
   const [isOthers, setIsOthers] = useState(false);
+  
+  // Refs
   const discountInputRef = useRef();
   const qtyInputRefs = useRef({});
   const searchInputRef = useRef();
-  const billPdfRef = useRef();
   const customerNameInputRef = useRef();
   const customerContactInputRef = useRef();
 
@@ -39,35 +37,18 @@ const Billing = () => {
   // Hotkeys
   useHotkeys('ctrl+k', (e) => { e.preventDefault(); searchInputRef.current?.focus(); }, { enableOnTags: ['INPUT'] });
   useHotkeys('ctrl+f', (e) => { e.preventDefault(); discountInputRef.current?.focus(); }, { enableOnTags: ['INPUT'] });
-  useHotkeys('ctrl+c', () => completeSale('save'));
+  useHotkeys('ctrl+c', () => completeSale('complete'));
 
   useEffect(() => {
     loadItems();
     generateBillNumber();
-  }, []);
-
-  useEffect(() => {
-    async function fetchSalesmen() {
-      const list = await window.electronAPI.getSalesmen(); 
-      console.log('Fetched salesmen:', list);
-      setSalesmen(list); 
-    }
     fetchSalesmen();
-  }, []);
-   async function fetchCustomers() {
-      const list = await window.electronAPI.getCustomers();
-      setCustomers(list || []);
-    }
-
-  useEffect(() => {
-   
     fetchCustomers();
   }, []);
 
   const loadItems = async () => {
     try {
       const data = await window.electronAPI.getInventory();
-      console.log('Loaded items:', data);
       setItems(data);
     } catch (error) {
       console.error('Error loading items:', error);
@@ -82,6 +63,24 @@ const Billing = () => {
       setBillNumber(number);
     } catch (error) {
       console.error('Error generating bill number:', error);
+    }
+  };
+
+  const fetchSalesmen = async () => {
+    try {
+      const list = await window.electronAPI.getSalesmen();
+      setSalesmen(list);
+    } catch (error) {
+      console.error('Error fetching salesmen:', error);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const list = await window.electronAPI.getCustomers();
+      setCustomers(list || []);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
     }
   };
 
@@ -107,17 +106,13 @@ const Billing = () => {
     }
   };
 
-  // --- Add to cart with empty quantity ---
+  // --- Add to cart with proper rate selection ---
   const addToCart = (item) => {
-    // Use salesman_rate if Others is checked, else normal logic
-    const rate = isOthers
-      ? item.salesman_rate
-      : isSalesmanCustomer
-        ? item.salesman_rate
-        : item.customer_rate;
+    const rate = isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
+    
     const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
     if (existingIndex !== -1) {
-      setCart(cart.map((cartItem, idx) =>
+      setCart(cart.map((cartItem) =>
         cartItem.id === item.id
           ? { ...cartItem, quantity: '', unit_price: rate }
           : cartItem
@@ -135,7 +130,7 @@ const Billing = () => {
             sku: item.sku,
             hsn_code: item.hsn_code,
             unit_price: rate,
-            quantity: '', // <-- empty
+            quantity: '',
             current_stock: item.current_stock,
             gst_percentage: item.gst_percentage,
             unit: item.unit
@@ -155,18 +150,13 @@ const Billing = () => {
       cart.map(cartItem => {
         const item = items.find(i => i.id === cartItem.id);
         if (!item) return cartItem;
-        const rate = isOthers
-          ? item.salesman_rate
-          : isSalesmanCustomer
-            ? item.salesman_rate
-            : item.customer_rate;
+        const rate = isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
         return { ...cartItem, unit_price: rate };
       })
     );
-    // eslint-disable-next-line
-  }, [isSalesmanCustomer, isOthers]);
+  }, [isSalesmanCustomer, isOthers, items]);
 
-  // --- Auto-select salesman to SELF when Others is checked ---
+  // --- Auto-select salesman when Others is checked ---
   useEffect(() => {
     if (isOthers) {
       const selfSalesman = salesmen.find(s => s.name?.toLowerCase() === 'self');
@@ -184,20 +174,17 @@ const Billing = () => {
     } else if (e.key === '-' || e.key === '_') {
       updateCartItemQuantity(itemId, (parseInt(cart[idx].quantity) || 0) - 1);
     }
-    // Tab or Enter returns focus to search
     if (e.key === 'Tab' || e.key === 'Enter') {
       e.preventDefault();
       searchInputRef.current?.focus();
     }
-    // Ctrl+F focuses discount
     if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
       e.preventDefault();
       discountInputRef.current?.focus();
     }
-    // Ctrl+C saves
     if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
       e.preventDefault();
-      completeSale('save');
+      completeSale('complete');
     }
   };
 
@@ -222,19 +209,13 @@ const Billing = () => {
     const baseAmount = item.unit_price * item.quantity;
     return { baseAmount, totalAmount: baseAmount };
   };
+  
   const getSubtotal = () => cart.reduce((sum, item) => sum + calculateItemTotal(item).baseAmount, 0);
-  const getTotal = () => {
-    const subtotal = getSubtotal();
-    const discountAmount = (subtotal * discount) / 100;
-    return subtotal - discountAmount;
-  };
-
-  // Rounding off calculation
+  
   const getRoundingOff = () => {
     const total = getSubtotal();
     const discountAmount = (total * discount) / 100;
     const net = total - discountAmount;
-    // Round to nearest integer
     return +(Math.round(net) - net).toFixed(2);
   };
 
@@ -252,18 +233,18 @@ const Billing = () => {
       toast.error('Cart is empty');
       return;
     }
+    
+    // Stock validation
     for (const cartItem of filteredCart) {
       if (parseInt(cartItem.quantity) > cartItem.current_stock) {
         toast.error(`Insufficient stock for ${cartItem.name}. Available: ${cartItem.current_stock}`);
         return;
       }
     }
+    
     try {
-      // Check and create customer if needed
-      if (
-        customerInfo.contact &&
-        /^\d{10}$/.test(customerInfo.contact.trim())
-      ) {
+      // Create customer if needed
+      if (customerInfo.contact && /^\d{10}$/.test(customerInfo.contact.trim())) {
         await window.electronAPI.createCustomerIfNeeded({
           name: customerInfo.name,
           contact: customerInfo.contact,
@@ -273,11 +254,11 @@ const Billing = () => {
       }
 
       const saleItems = filteredCart.map(item => {
-        const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
+        const { totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
         return { 
           id: item.id,
           quantity: parseInt(item.quantity),
-          unit_price: item.unit_price, 
+          unit_price: item.unit_price,
           gst_percentage: item.gst_percentage,
           total_price: totalAmount
         };
@@ -295,22 +276,20 @@ const Billing = () => {
         total_amount: getFinalTotal(),
         rounding_off: getRoundingOff(),
         salesman_id: selectedSalesman || null,
-        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')
+        sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer'),
+        narration: billNarration
       };
       
-      if (window.electronAPI) {
-        await window.electronAPI.saveSale(saleData);
-        console.log('saleData:', saleData);
-      }
+      await window.electronAPI.saveSale(saleData);
 
-      // --- PDF/PRINT GENERATION: Do this BEFORE resetting cart/bill/customer ---
+      // --- PDF/PRINT GENERATION ---
       if (action === 'pdf' || action === 'print') {
         try {
           const pdfContainer = document.createElement('div');
           pdfContainer.style.position = 'fixed';
           pdfContainer.style.left = '-9999px';
           pdfContainer.style.top = '0';
-          pdfContainer.style.width = '210mm'; // Keep A4 width
+          pdfContainer.style.width = '210mm';
           pdfContainer.style.zIndex = '-1';
           document.body.appendChild(pdfContainer);
 
@@ -334,7 +313,7 @@ const Billing = () => {
               total={getFinalTotal()}
               sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
               salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-              salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info || ""}
+              salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact || ""}
               salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
               note={billNarration}
             />
@@ -344,20 +323,20 @@ const Billing = () => {
             const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: 'a4' // Keep A4 for both print and PDF
+              format: 'a4'
             });
 
             const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
 
             for (let i = 0; i < pageElements.length; i++) {
-              if (i > 0) pdf.addPage(); 
+              if (i > 0) pdf.addPage();
 
               const canvas = await html2canvas(pageElements[i], {
                 scale: 1.5,
                 useCORS: true,
                 allowTaint: true,
-                width: 794, // A4 width
-                height: 1123, // A4 height
+                width: 794,
+                height: 1123,
                 backgroundColor: '#ffffff'
               });
 
@@ -368,7 +347,6 @@ const Billing = () => {
             }
 
             if (action === 'print') {
-              // Send to printer
               const pdfOutput = pdf.output('arraybuffer');
               const result = await window.electronAPI.printPdf(pdfOutput);
               
@@ -378,12 +356,10 @@ const Billing = () => {
                 toast.error('Failed to print: ' + result.error);
               }
             } else {
-              // Download PDF
               pdf.save(`Invoice_${billNumber}.pdf`);
               toast.success('PDF generated and downloaded!');
             }
 
-            // Cleanup
             root.unmount();
             document.body.removeChild(pdfContainer);
           }, 1000);
@@ -391,198 +367,32 @@ const Billing = () => {
           toast.error('Error generating PDF/Print');
         }
       }
-      // --- END PDF/PRINT GENERATION ---
 
-      // Now reset form
-      setLastSaleData({
-        billNumber,
-        customer: customerInfo,
-        items: cart.map(item => ({
-          hsn_code: item.hsn_code,
-          sku: item.sku,
-          name: item.name,
-          quantity: parseInt(item.quantity) || 0,
-          unit_price: item.unit_price
-        })),
-        discount,
-        subtotal: getSubtotal(),
-        total: getTotal()
-      });
+      // Reset form
       setCart([]);
       setDiscount(0);
       setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+      setBillNarration('');
+      setSelectedSalesman('');
+      setIsSalesmanCustomer(false);
+      setIsOthers(false);
       await generateBillNumber();
       await loadItems();
+      await fetchCustomers();
       toast.success('Sale completed successfully!');
-      fetchCustomers();
+      
     } catch (error) {
       console.error('Error completing sale:', error);
       toast.error('Error completing sale');
     }
   };
 
-  // Add this function to handle printing
-const handlePrintSale = async () => {
-  const filteredCart = cart.filter(item => parseInt(item.quantity) > 0);
-  if (filteredCart.length === 0) {
-    toast.error('Cart is empty');
-    return;
-  }
-
-  try {
-    // First complete the sale
-    await completeSaleData();
-    
-    // Generate PDF for printing
-    const pdfContainer = document.createElement('div');
-    pdfContainer.style.position = 'fixed';
-    pdfContainer.style.left = '-9999px';
-    pdfContainer.style.top = '0';
-    pdfContainer.style.width = '210mm';
-    pdfContainer.style.zIndex = '-1';
-    document.body.appendChild(pdfContainer);
-
-    const { createRoot } = await import('react-dom/client');
-    const root = createRoot(pdfContainer);
-    
-    root.render(
-     <BillPDF
-  billNumber={billNumber}
-  customer={customerInfo}
-  items={cart.map(item => ({
-    hsn_code: item.hsn_code,
-    sku: item.sku,
-    name: item.name,
-    quantity: parseInt(item.quantity) || 0,
-    unit_price: item.unit_price
-  }))}
-  discount={discount}
-  subtotal={getSubtotal()}
-  roundingOff={getRoundingOff()}
-  total={getFinalTotal()}
-  sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
-  salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-  salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
- || ""}
-  salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
-  note={billNarration}
-/>
-    ); 
-
-    setTimeout(async () => {
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
-
-      for (let i = 0; i < pageElements.length; i++) {
-        if (i > 0) pdf.addPage();
-
-        const canvas = await html2canvas(pageElements[i], {
-          scale: 1.5,
-          useCORS: true,
-          allowTaint: true, 
-          width: 794, // A4 width in pixels at 96 DPI
-          height: 1123, 
-          backgroundColor: '#ffffff'
-        });
-
-        const imgData = canvas.toDataURL('image/png');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
-      }
-
-      // Get PDF as array buffer
-      const pdfOutput = pdf.output('arraybuffer');
-      
-      // Send to printer
-      const result = await window.electronAPI.printPdf(pdfOutput);
-      
-      if (result.success) {
-        toast.success('Invoice sent to printer!');
-      } else {
-        toast.error('Failed to print: ' + result.error);
-      }
-
-      // Cleanup
-      root.unmount();
-      document.body.removeChild(pdfContainer);
-    }, 1000);
-
-  } catch (error) {
-    console.error('Print error:', error);
-    toast.error('Error printing invoice');
-  }
-};
-
-// Separate function for just saving sale data
-const completeSaleData = async () => {
-  const filteredCart = cart.filter(item => parseInt(item.quantity) > 0);
-  
-  // Check stock and customer validation...
-  // (Copy the validation logic from your completeSale function)
-  
-  const saleItems = filteredCart.map (item => {
-    const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
-    const origItem = items.find(i => i.id === item.id);
-    return {
-      id: item.id,
-      quantity: parseInt(item.quantity),
-      unit_price: item.unit_price, 
-      gst_percentage: item.gst_percentage,
-      total_price: totalAmount
-    };
-  }); 
-
-  const saleData = { 
-    bill_number: billNumber,
-    customer_name: customerInfo.name || null,
-    customer_contact: customerInfo.contact || null,
-    customer_address: customerInfo.address || null,
-    customer_gstin: customerInfo.gstin || null,
-    sale_date: new Date().toISOString().split('T')[0],
-    items: saleItems,
-    discount,
-    total_amount: getFinalTotal(),
-    rounding_off: getRoundingOff(),
-    salesman_id: selectedSalesman || null,
-    sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')
-  };
-
-  await window.electronAPI.saveSale(saleData);
-  
-  // Reset form
-  setCart([]);
-  setDiscount(0);
-  setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
-  await generateBillNumber();
-  await loadItems();
-  fetchCustomers();
-};
-  // --- Show purchase history for item ---
-  const showPurchaseHistory = async (itemId) => {
-    try {
-      const history = await window.electronAPI.getItemPurchaseHistory(itemId);
-      console.log('Item Purchase History:', history);
-      setItemHistory(history || []);
-      setShowItemHistory(itemId);
-    } catch (error) {
-      setItemHistory([]);
-      setShowItemHistory(itemId);
-    }
-  };
-
-  // --- Filter customers by name or contact ---
+  // --- Customer dropdown handling ---
   const filteredCustomers = customers.filter(c =>
     (customerInfo.name && c.name?.toLowerCase().includes(customerInfo.name.toLowerCase())) ||
     (customerInfo.contact && c.contact?.includes(customerInfo.contact))
   );
 
-  // --- Handle dropdown selection ---
   const handleCustomerSelect = (customer) => {
     setCustomerInfo({
       name: customer.name || '',
@@ -593,7 +403,6 @@ const completeSaleData = async () => {
     setCustomerDropdown(false);
   };
 
-  // --- Handle Tab/Enter key for auto-fill ---
   const handleCustomerInputKeyDown = (e, field) => {
     if (e.key === 'Delete') {
       setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
@@ -611,41 +420,10 @@ const completeSaleData = async () => {
       handleCustomerSelect(filteredCustomers[customerDropdownIndex]);
       setCustomerDropdown(false);
       setCustomerDropdownIndex(0);
-      // Focus next field
       if (field === 'name') customerContactInputRef.current?.focus();
       else if (field === 'contact') customerNameInputRef.current?.focus();
     }
   };
-
-  // --- Add new customer if not found ---
-  const handleAddCustomerFromInput = async () => {
-    if (
-      customerInfo.name.trim().length > 0 &&
-      customerInfo.contact.trim().length === 10 &&
-      !customers.some(c => c.contact === customerInfo.contact)
-    ) {
-      const newCustomer = await window.electronAPI.addCustomer({
-        name: customerInfo.name,
-        contact: customerInfo.contact,
-        address: customerInfo.address,
-        gstin: customerInfo.gstin
-      });
-      setCustomers([...customers, newCustomer]);
-      toast.success('Customer added!');
-    }
-  };
-
-  useEffect(() => {
-    setCart(cart =>
-      cart.map(cartItem => {
-        const item = items.find(i => i.id === cartItem.id);
-        if (!item) return cartItem;
-        const rate = isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
-        return { ...cartItem, unit_price: rate };
-      })
-    );
-    // eslint-disable-next-line
-  }, [isSalesmanCustomer]);
 
   if (loading) {
     return (
@@ -713,6 +491,7 @@ const completeSaleData = async () => {
                   </ul>
                 )}
               </div>
+              
               {/* Contact with dropdown */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
@@ -750,6 +529,7 @@ const completeSaleData = async () => {
                   </ul>
                 )}
               </div>
+              
               {/* Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
@@ -762,6 +542,7 @@ const completeSaleData = async () => {
                   tabIndex={3}
                 />
               </div>
+              
               {/* GSTIN */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">GSTIN (Optional)</label>
@@ -775,6 +556,7 @@ const completeSaleData = async () => {
                 />
               </div>
             </div>
+            
             <div className="flex items-center mt-6 space-x-6">
               <div className="flex items-center">
                 <input
@@ -810,40 +592,34 @@ const completeSaleData = async () => {
               <User className="w-5 h-5 mr-2" />
               Salesman
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Salesman</label>
-                <select
-                  value={selectedSalesman}
-                  onChange={e => setSelectedSalesman(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  disabled={isOthers}
-                >
-                  <option value="">Select Salesman</option>
-                  {salesmen.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Salesman</label>
+              <select
+                value={selectedSalesman}
+                onChange={e => setSelectedSalesman(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isOthers}
+              >
+                <option value="">Select Salesman</option>
+                {salesmen.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             </div>
           </div>
+
+          {/* Bill Narration */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <User className="w-5 h-5 mr-2" />
-              Bill Narration
-            </h2>
-            
-              <div>
-                
-               <textarea
-                   value={billNarration}
-                  onChange={e => setBillNarration(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                />  
-              
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Bill Narration</h2>
+            <textarea
+              value={billNarration}
+              onChange={e => setBillNarration(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows={3}
+              placeholder="Additional notes for this bill..."
+            />
           </div>
+
           {/* Search */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="relative">
@@ -879,45 +655,14 @@ const completeSaleData = async () => {
                       }}
                       tabIndex={-1}
                     >
-                      {item.name} <span className="text-xs text-gray-400">({item.current_stock} {item.unit})</span>
+                      {item.name} 
+                      <span className="text-xs text-gray-400 ml-2">
+                        (Stock: {item.current_stock}, Rate: ₹{isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate})
+                      </span>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
-          </div>
-
-          {/* Items Grid (optional, for mouse users) */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Items</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {filteredItems.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium text-gray-900">{item.name}</h3>
-                    <button
-                      onClick={() => showPurchaseHistory(item.id)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <History className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1">SKU: {item.sku}</p>
-                  {item.hsn_code && <p className="text-sm text-gray-600 mb-1">HSN: {item.hsn_code}</p>}
-                  <p className="text-sm text-gray-600 mb-2">Stock: {item.current_stock} {item.unit}</p>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-lg font-bold text-gray-900">₹{item.customer_rate}</span>
-                  </div>
-                  <button
-                    onClick={() => addToCart(item)}
-                    disabled={item.current_stock === 0}
-                    className="w-full flex items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors"
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add to Cart
-                  </button>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -934,7 +679,7 @@ const completeSaleData = async () => {
             ) : (
               <div className="space-y-4">
                 {cart.map((item, idx) => {
-                  const { baseAmount, totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) || 0 });
+                  const { totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) || 0 });
                   return (
                     <div key={item.id} className="border-b border-gray-200 pb-4 flex flex-col gap-2">
                       <div className="flex items-center justify-between mb-2">
@@ -947,30 +692,60 @@ const completeSaleData = async () => {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <label className="sr-only">Quantity</label>
-                        <input
-                          ref={el => qtyInputRefs.current[item.id] = el}
-                          type="number"
-                          onWheel={e => e.target.blur()}
-                          value={item.quantity}
-                          min={1}
-                          max={item.current_stock}
-                          onChange={e => {
-                            const val = parseInt(e.target.value);
-                            if (!val || val <= 0) {
-                              removeFromCart(item.id);
-                            } else {
-                              updateCartItemQuantity(item.id, val);
-                            }
-                          }}
-                          onKeyDown={e => handleCartKeyDown(e, idx, item.id)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                          tabIndex={0}
-                          autoFocus={item.quantity === ''}
-                        />
-                        <span className="text-gray-500">/ {item.current_stock} {item.unit}</span>
-                        <span className="ml-auto font-medium">₹{totalAmount.toFixed(2)}</span>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Quantity Input */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              ref={el => qtyInputRefs.current[item.id] = el}
+                              type="number"
+                              onWheel={e => e.target.blur()}
+                              value={item.quantity}
+                              min={1}
+                              max={item.current_stock}
+                              onChange={e => {
+                                const val = parseInt(e.target.value);
+                                if (!val || val <= 0) {
+                                  removeFromCart(item.id);
+                                } else {
+                                  updateCartItemQuantity(item.id, val);
+                                }
+                              }}
+                              onKeyDown={e => handleCartKeyDown(e, idx, item.id)}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
+                              tabIndex={0}
+                              autoFocus={item.quantity === ''}
+                            />
+                            <span className="text-xs text-gray-500">/ {item.current_stock}</span>
+                          </div>
+                        </div>
+
+                        {/* Unit Price Input */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            onWheel={e => e.target.blur()}
+                            value={item.unit_price}
+                            onChange={e => {
+                              const newPrice = parseFloat(e.target.value) || 0;
+                              setCart(cart.map(cartItem =>
+                                cartItem.id === item.id
+                                  ? { ...cartItem, unit_price: newPrice }
+                                  : cartItem
+                              ));
+                            }}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder="₹0.00"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <span className="font-medium text-gray-900">Total: ₹{totalAmount.toFixed(2)}</span>
                       </div>
                     </div>
                   );
@@ -991,12 +766,6 @@ const completeSaleData = async () => {
                     min="0"
                     max="100"
                     tabIndex={0}
-                    onKeyDown={e => {
-                      if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
-                        e.preventDefault();
-                        completeSale('save');
-                      }
-                    }}
                   />
                 </div>
 
@@ -1024,7 +793,7 @@ const completeSaleData = async () => {
 
                 {/* Action Buttons */}
                 <div className="space-y-2 mt-4">
-                  <button
+                  <button 
                     onClick={() => completeSale('complete')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
@@ -1032,11 +801,11 @@ const completeSaleData = async () => {
                     <Save className="w-4 h-4 mr-2" />
                     Complete Sale (Ctrl+C)
                   </button>
-                 <button
+                  <button
                     onClick={() => completeSale('print')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
-                  > 
+                  >
                     <Printer className="w-4 h-4 mr-2" />
                     Complete & Print
                   </button>
@@ -1045,16 +814,8 @@ const completeSaleData = async () => {
                     className="w-full flex items-center justify-center px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
                   >
-                    <Download className="w-4 h-4 mr-2" /> 
+                    <Download className="w-4 h-4 mr-2" />
                     Complete & Generate PDF
-                  </button>
-                  <button
-                    onClick={() => completeSale('pdf')}
-                    className="w-full flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                    tabIndex={0}
-                  >
-                    <SendHorizontal className="w-4 h-4 mr-2" />
-                    WhatsApp Invoice
                   </button>
                 </div>
               </div>
@@ -1062,76 +823,8 @@ const completeSaleData = async () => {
           </div>
         </div>
       </div>
-
-      {/* Item History Modal */}
-      {showItemHistory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-96 overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Purchase History</h2>
-              <button
-                onClick={() => setShowItemHistory(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <span className="text-xl">×</span>
-              </button>
-            </div>
-            {itemHistory.length > 0 ? (
-              <div className="space-y-3">
-                {itemHistory.map((record, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Supplier:</span> {record.supplier_name}
-                      </div>
-                      <div>
-                        <span className="font-medium">Date:</span> {new Date(record.purchase_date).toLocaleDateString()}
-                      </div>
-                      <div>
-                        <span className="font-medium">Quantity:</span> {record.quantity}
-                      </div>
-                      <div>
-                        <span className="font-medium">Price:</span> ₹{record.unit_price}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-600 text-center py-8">No purchase history available</p>
-            )}
-          </div>
-        </div>
-      )} 
-
-      {/* Hidden BillPDF for PDF generation */}
-      {/* <div style={{ position: "absolute", left: "-9999px", top: 0 }}> */}
-        <div>
-        <div ref={billPdfRef}>
-         <BillPDF
-          billNumber={billNumber}
-          customer={customerInfo}
-          items={cart.map(item => ({
-            hsn_code: item.hsn_code,
-            sku: item.sku,
-            name: item.name,
-            quantity: parseInt(item.quantity) || 0,
-            unit_price: item.unit_price
-          }))}
-          discount={discount}
-          subtotal={getSubtotal()}
-          roundingOff={getRoundingOff()}
-          total={getFinalTotal()}
-          sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
-          salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-          salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info
- || ""}
-          salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
-          note={billNarration}
-        />
-        </div>
-      </div>
     </div>
   );
 };
+
 export default Billing;

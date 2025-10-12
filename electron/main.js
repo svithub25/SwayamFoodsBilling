@@ -470,7 +470,7 @@ ipcMain.handle('get-dashboard-data', async () => {
       and (status_code = 0 OR status_code IS NULL)
     `).get();
     const totalItems = db.prepare('SELECT COUNT(*) as count FROM items where (status_code = 0 OR status_code IS NULL)').get();
-    const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock <= minimum_stock and (status_code = 0 OR status_code IS NULL)').get();
+    const lowStockItems = db.prepare('SELECT COUNT(*) as count FROM items WHERE current_stock < minimum_stock and (status_code = 0 OR status_code IS NULL)').get();
     const totalInventoryValue = db.prepare('SELECT COALESCE(SUM(current_stock * customer_rate), 0) as total FROM items where (status_code = 0 OR status_code IS NULL)').get();
     const recentSales = db.prepare(`
       SELECT DATE(sale_date) as date, SUM(total_amount) as amount 
@@ -484,7 +484,7 @@ ipcMain.handle('get-dashboard-data', async () => {
       SELECT i.name, i.current_stock, i.minimum_stock, c.name as category
       FROM items i 
       LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.current_stock <= i.minimum_stock and (i.status_code = 0 OR i.status_code IS NULL)
+      WHERE i.current_stock < i.minimum_stock and (i.status_code = 0 OR i.status_code IS NULL)
       LIMIT 10
     `).all();
     return {

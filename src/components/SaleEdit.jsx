@@ -167,21 +167,51 @@ const filteredItems = items.filter(i =>
       document.getElementById(`qty-input-${form.items.length}`)?.focus();
     }, 0);
   };
-
-  const updateSaleItem = (idx, field, value) => {
-    setForm(f => {
-      const items = [...f.items];
-      if (field === 'quantity') {
-        items[idx][field] = value;
-        // Update total_price
-        const qty = parseFloat(items[idx].quantity) || 0;
-        const rate = parseFloat(items[idx].unit_price) || 0;
-        items[idx].total_price = qty * rate;
+const addItemToSale = (item) => {
+  if (!item) return;
+  if (form.items.some(i => i.id === item.id)) {
+    toast.warn('Item already in sale');
+    setShowItemList(false);
+    setItemSearch('');
+    return;
+  }
+  setForm(f => ({
+    ...f,
+    items: [
+      ...f.items,
+      {
+        id: item.id,
+        name: item.name,
+        hsn_code: item.hsn_code,
+        quantity: 1, // Default quantity
+        unit_price: item.mrp || item.sale_rate || 0, // Use MRP or sale_rate as default
+        total_price: item.mrp || item.sale_rate || 0 // Initial total
       }
-      // Do not allow rate change
-      return { ...f, items };
-    });
-  };
+    ]
+  }));
+  setShowItemList(false);
+  setItemSearch('');
+  setItemDropdownIndex(0);
+  setTimeout(() => {
+    document.getElementById(`qty-input-${form.items.length}`)?.focus();
+  }, 0);
+};
+
+const updateSaleItem = (idx, field, value) => {
+  setForm(f => {
+    const items = [...f.items];
+    items[idx][field] = value;
+    
+    // Recalculate total_price when quantity or unit_price changes
+    if (field === 'quantity' || field === 'unit_price') {
+      const qty = parseFloat(items[idx].quantity) || 0;
+      const rate = parseFloat(items[idx].unit_price) || 0;
+      items[idx].total_price = qty * rate;
+    }
+    
+    return { ...f, items };
+  });
+};
 
   const removeSaleItem = (idx) => {
     setForm(f => ({
@@ -489,12 +519,30 @@ const filteredItems = items.filter(i =>
                         />
                       </td>
                       <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          value={item.unit_price}
-                          disabled
-                          className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-100 text-gray-500 cursor-not-allowed"
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            onWheel={e => e.target.blur()}
+                            value={item.unit_price}
+                            min={0}
+                            onChange={e => updateSaleItem(idx, 'unit_price', e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                            placeholder="₹0.00"
+                          />
+                          <button
+                            onClick={() => {
+                              const originalItem = items.find(i => i.id === item.id);
+                              if (originalItem) {
+                                updateSaleItem(idx, 'unit_price', originalItem.mrp || originalItem.sale_rate || 0);
+                              }
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                            title="Reset to MRP"
+                          >
+                            Reset
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-2 font-semibold">₹{item.total_price?.toLocaleString()}</td>
                       <td className="px-4 py-2">
