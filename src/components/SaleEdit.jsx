@@ -296,22 +296,22 @@ const SaleEdit = () => {
       toast.error('Please enter at least one valid item');
       return;
     }
-
+ 
     // --- STOCK VALIDATION ---
-    for (const item of validItems) {
-      const stockItem = items.find(i => i.id === item.id);
-      // Find the original quantity from the loaded sale
-      const originalSaleItem = sale?.items?.find(si => si.item_id === item.id);
-      const originalQty = originalSaleItem ? parseInt(originalSaleItem.quantity) : 0;
-      const maxAllowedQty = (stockItem?.current_stock || 0) + originalQty;
+    // for (const item of validItems) {
+    //   const stockItem = items.find(i => i.id === item.id);
+    //   // Find the original quantity from the loaded sale
+    //   const originalSaleItem = sale?.items?.find(si => si.item_id === item.id);
+    //   const originalQty = originalSaleItem ? parseInt(originalSaleItem.quantity) : 0;
+    //   const maxAllowedQty = (stockItem?.current_stock || 0) + originalQty;
 
-      if (parseInt(item.quantity) > maxAllowedQty) {
-        toast.error(
-          `Insufficient stock for ${item.name}. Available for sale: ${maxAllowedQty} (Current stock: ${stockItem?.current_stock || 0}, Previously sold: ${originalQty})`
-        );
-        return;
-      }
-    }
+    //   if (parseInt(item.quantity) > maxAllowedQty) {
+    //     toast.error(
+    //       `Insufficient stock for ${item.name}. Available for sale: ${maxAllowedQty} (Current stock: ${stockItem?.current_stock || 0}, Previously sold: ${originalQty})`
+    //     );
+    //     return;
+    //   }
+    // }
     // --- END STOCK VALIDATION ---
 
     try {

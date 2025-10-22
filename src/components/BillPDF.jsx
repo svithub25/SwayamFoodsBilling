@@ -5,7 +5,7 @@ const ITEMS_PER_PAGE = 10;
 
 function BillPDF({ billNumber, customer, items, discount = 0, subtotal = 0, roundingOff = 0, total = 0, sale_type = "", salesman_name = "", salesman_contact = "", salesman_address = "", note = ""}) {
   // Split items into pages
-  console.log(sale_type) 
+  console.log(salesman_contact)  
   const pages = []; 
   for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
     pages.push(items.slice(i, i + ITEMS_PER_PAGE));

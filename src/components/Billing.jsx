@@ -88,7 +88,7 @@ const Billing = () => {
   const filteredItems = items.filter(item =>
     (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
-    && item.current_stock > 0
+    //&& item.current_stock > 0
   );
 
   const handleSearchKeyDown = (e) => {
@@ -235,12 +235,12 @@ const Billing = () => {
     }
     
     // Stock validation
-    for (const cartItem of filteredCart) {
-      if (parseInt(cartItem.quantity) > cartItem.current_stock) {
-        toast.error(`Insufficient stock for ${cartItem.name}. Available: ${cartItem.current_stock}`);
-        return;
-      }
-    }
+    // for (const cartItem of filteredCart) {
+    //   if (parseInt(cartItem.quantity) > cartItem.current_stock) {
+    //     toast.error(`Insufficient stock for ${cartItem.name}. Available: ${cartItem.current_stock}`);
+    //     return;
+    //   }
+    // }
     
     try {
       // Create customer if needed
@@ -313,17 +313,17 @@ const Billing = () => {
               total={getFinalTotal()}
               sale_type={isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer')}
               salesman_name={salesmen.find(s => String(s.id) === String(selectedSalesman))?.name || ""}
-              salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact || ""}
+              salesman_contact={salesmen.find(s => String(s.id) === String(selectedSalesman))?.contact_info || ""}
               salesman_address={salesmen.find(s => String(s.id) === String(selectedSalesman))?.address || ""}
               note={billNarration}
             />
           );
 
-          setTimeout(async () => {
-            const pdf = new jsPDF({
+          setTimeout(async () => { 
+            const pdf = new jsPDF({ 
               orientation: 'portrait',
               unit: 'mm',
-              format: 'a4'
+              format: 'a4' 
             });
 
             const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
