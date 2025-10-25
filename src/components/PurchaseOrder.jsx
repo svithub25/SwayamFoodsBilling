@@ -336,7 +336,7 @@ const PurchaseOrder = () => {
             </div>
 
             {/* Items Grid */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Available Items</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredItems.map((item) => (
@@ -360,7 +360,7 @@ const PurchaseOrder = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Order Summary */}

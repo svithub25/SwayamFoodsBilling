@@ -820,6 +820,14 @@ const Billing = () => {
                     <Download className="w-4 h-4 mr-2" />
                     Complete & Generate PDF
                   </button>
+                  <button
+                    onClick={()=> toast.info('Comming Soon')}
+                    className="w-full flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                    tabIndex={0}
+                  >
+                    <SendHorizontal className="w-4 h-4 mr-2" />
+                    WhatsApp Invoice
+                  </button>
                 </div>
               </div>
             )}

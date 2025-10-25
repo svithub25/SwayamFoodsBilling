@@ -485,7 +485,7 @@ ipcMain.handle('get-dashboard-data', async () => {
       FROM items i 
       LEFT JOIN categories c ON i.category_id = c.id
       WHERE i.current_stock < i.minimum_stock and (i.status_code = 0 OR i.status_code IS NULL)
-      LIMIT 10
+      LIMIT 12
     `).all();
     return {
       totalSales: totalSales.total,
@@ -624,6 +624,9 @@ ipcMain.handle('delete-item', async (event, id) => {
 
 ipcMain.handle('get-categories', async () => {
   return db.prepare('SELECT * FROM categories WHERE (status_code = 0 OR status_code IS NULL) ORDER BY name').all(); 
+});
+ipcMain.handle('get-items', async () => {
+  return db.prepare('SELECT * FROM items WHERE (status_code = 0 OR status_code IS NULL) ORDER BY name').all(); 
 });
 
 ipcMain.handle('get-suppliers', async () => {
@@ -2488,7 +2491,8 @@ function reduceClosingStock(itemId, qtySold) {
 
 
 // ...existing code...
-// ...existing code...
+// ...existing code...// ...existing code...
+
 ipcMain.handle('get-Salesman-Commission', async () => {
   // Get all sales where sale_type is 'customer'
   const sales = db.prepare(`
@@ -2503,7 +2507,7 @@ ipcMain.handle('get-Salesman-Commission', async () => {
   const commissionData = [];
   for (const sale of sales) {
     const items = db.prepare(`
-      SELECT si.*, i.name as item_name
+      SELECT si.*, i.name as item_name, i.id as item_id
       FROM sale_items si
       LEFT JOIN items i ON si.item_id = i.id
       WHERE si.sale_id = ? AND si.sale_type = 'customer'
@@ -2515,6 +2519,7 @@ ipcMain.handle('get-Salesman-Commission', async () => {
       const commission = (item.unit_price - item.salesman_rate) * item.quantity;
       totalCommission += commission;
       return {
+        item_id: item.item_id, // Changed from item.id to item.item_id
         item_name: item.item_name,
         quantity: item.quantity,
         customer_rate: item.customer_rate,
@@ -2538,6 +2543,8 @@ ipcMain.handle('get-Salesman-Commission', async () => {
 
   return commissionData;
 });
+
+// ...existing code...
 
 ipcMain.handle('get-bill-message', async () => {
   const row = db.prepare('SELECT * FROM bill_message WHERE status_code = 0 ORDER BY updated_at DESC LIMIT 1').get();

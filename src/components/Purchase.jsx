@@ -11,7 +11,9 @@ import {
   Eye,
   History,
   Edit3,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -374,7 +376,7 @@ const updateOverallDiscount = (newDiscount) => {
     return;
   } 
 
-    if (!purchaseForm.supplier_id || !purchaseForm.invoice_number || purchaseForm.items.length === 0) {
+    if (!purchaseForm.supplier_id  || purchaseForm.items.length === 0) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -609,7 +611,69 @@ const getFilteredItems = (search) =>
     })
     .sort((a, b) => b.id - a.id); // Latest purchase.id first
 
-  // Delete purchase handler
+  // Pagination state variables
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    const total = Math.ceil(filteredHistory.length / itemsPerPage);
+    setTotalPages(total);
+    
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredHistory.length, itemsPerPage, currentPage]);
+
+  // Get current page data
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentPurchases = filteredHistory.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Pagination handlers
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
+  };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [historyFilters.supplier, historyFilters.invoice, historyFilters.date]);
+
   const handleDeletePurchase = async (purchaseId) => {
     try {
       // 1. Ask Electron for a stock check before deletion
@@ -1192,124 +1256,215 @@ const getFinalTotal = () => Math.round(totalWithGst);
         </div>
       </div>
 
+    
       {/* Purchase History */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Purchase History</h2>
-        
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-4">
-          <input
-            type="text"
-            value={historyFilters.supplier}
-            onChange={e => setHistoryFilters(f => ({ ...f, supplier: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Filter by supplier"
-          />
-          <input
-            type="text"
-            value={historyFilters.invoice}
-            onChange={e => setHistoryFilters(f => ({ ...f, invoice: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Filter by invoice"
-          />
-          <input
-            type="date"
-            value={historyFilters.date}
-            onChange={e => setHistoryFilters(f => ({ ...f, date: e.target.value }))}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Filter by date"
-          />
-        </div>
+<div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+  <h2 className="text-lg font-semibold text-gray-900 mb-4">Purchase History</h2>
+  
+  {/* Filters */}
+  <div className="flex flex-col md:flex-row gap-4 mb-4">
+    <input
+      type="text"
+      value={historyFilters.supplier}
+      onChange={e => setHistoryFilters(f => ({ ...f, supplier: e.target.value }))}
+      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      placeholder="Filter by supplier"
+    />
+    <input
+      type="text"
+      value={historyFilters.invoice}
+      onChange={e => setHistoryFilters(f => ({ ...f, invoice: e.target.value }))}
+      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      placeholder="Filter by invoice"
+    />
+    <input
+      type="date"
+      value={historyFilters.date}
+      onChange={e => setHistoryFilters(f => ({ ...f, date: e.target.value }))}
+      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      placeholder="Filter by date"
+    />
+  </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase No.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredHistory.map((purchase) => (
-                <tr key={purchase.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {purchase.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(purchase.purchase_date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {purchase.invoice_number}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {purchase.supplier_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ₹{purchase.total_amount.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <div className="flex items-center space-x-2">
-                      <input 
-                        type="checkbox" 
-                        checked={purchase.is_paid === 1}
-                        onChange={(e) => handlePurchasePaidChange(purchase.id, e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      {purchase.is_paid === 1 && purchase.payment_method && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                          {purchase.payment_method.toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
-                    {/* Existing action buttons */}
-                    <button
-                      className="text-blue-600 hover:text-blue-800"
-                      onClick={() => navigate(`/purchase/${purchase.id}`)}
-                      tabIndex={-1}
-                      title="View Purchase Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900"
-                      onClick={() => navigate(`/purchaseupdate/${purchase.id}`)}
-                      tabIndex={-1} 
-                      title="Edit Purchase"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="text-black-600 hover:text-black-900"
-                      onClick={() => {
-                        setDeleteId(purchase.id);
-                        setConfirmDeleteOpen(true);
-                      }}
-                      tabIndex={-1}
-                      title="Delete Purchase"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                   <button
-                    onClick={() => handleReprintPurchase(purchase.id)}
-                    className="text-purple-600 hover:text-purple-900"
-                    title="Reprint Purchase"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </button> 
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+  {/* Record count display */}
+  <div className="flex items-center justify-between mb-4">
+    <div className="text-sm text-gray-600">
+      Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredHistory.length)} of {filteredHistory.length} purchases
+    </div>
+  </div>
+
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase No.</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-200">
+        {currentPurchases.map((purchase) => (
+          <tr key={purchase.id}>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {purchase.id}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {new Date(purchase.purchase_date).toLocaleDateString()}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {purchase.invoice_number}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {purchase.supplier_name}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              ₹{purchase.total_amount.toLocaleString()}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="checkbox" 
+                  checked={purchase.is_paid === 1}
+                  onChange={(e) => handlePurchasePaidChange(purchase.id, e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                {purchase.is_paid === 1 && purchase.payment_method && (
+                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    {purchase.payment_method.toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+              <button
+                className="text-blue-600 hover:text-blue-800"
+                onClick={() => navigate(`/purchase/${purchase.id}`)}
+                tabIndex={-1}
+                title="View Purchase Details"
+              >
+                <Eye className="w-4 h-4" />
+              </button>
+              <button
+                className="text-red-600 hover:text-red-900"
+                onClick={() => navigate(`/purchaseupdate/${purchase.id}`)}
+                tabIndex={-1} 
+                title="Edit Purchase"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+              <button
+                className="text-black-600 hover:text-black-900"
+                onClick={() => {
+                  setDeleteId(purchase.id);
+                  setConfirmDeleteOpen(true);
+                }}
+                tabIndex={-1}
+                title="Delete Purchase"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleReprintPurchase(purchase.id)}
+                className="text-purple-600 hover:text-purple-900"
+                title="Reprint Purchase"
+              >
+                <FileText className="w-4 h-4" />
+              </button> 
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    {currentPurchases.length === 0 && (
+      <div className="text-center py-12">
+        <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <p className="text-gray-600">No purchase records found</p>
       </div>
+    )}
+  </div>
+
+  {/* Pagination Controls */}
+  {totalPages > 1 && (
+    <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between mt-4">
+      <div className="flex items-center">
+        <button
+          onClick={goToPreviousPage}
+          disabled={currentPage === 1}
+          className={`flex items-center px-3 py-2 rounded-lg mr-2 ${
+            currentPage === 1
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Previous
+        </button>
+        
+        <div className="flex gap-1">
+          {currentPage > 3 && (
+            <>
+              <button
+                onClick={() => goToPage(1)}
+                className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              >
+                1
+              </button>
+              {currentPage > 4 && <span className="px-2 py-2">...</span>}
+            </>
+          )}
+          
+          {getPageNumbers().map((pageNum) => (
+            <button
+              key={pageNum}
+              onClick={() => goToPage(pageNum)}
+              className={`px-3 py-2 rounded-lg ${
+                currentPage === pageNum
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
+              {pageNum}
+            </button>
+          ))}
+          
+          {currentPage < totalPages - 2 && (
+            <>
+              {currentPage < totalPages - 3 && <span className="px-2 py-2">...</span>}
+              <button
+                onClick={() => goToPage(totalPages)}
+                className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+        </div>
+        
+        <button
+          onClick={goToNextPage}
+          disabled={currentPage === totalPages}
+          className={`flex items-center px-3 py-2 rounded-lg ml-2 ${
+            currentPage === totalPages
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          Next
+          <ChevronRight className="w-4 h-4 ml-1" />
+        </button>
+      </div>
+      
+      <div className="text-sm text-gray-600">
+        Page {currentPage} of {totalPages}
+      </div>
+    </div>
+  )}
+</div>
 
       {/* Confirm Delete Modal */}
       {confirmDeleteOpen && (

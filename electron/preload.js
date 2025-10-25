@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteItem: (id) => ipcRenderer.invoke('delete-item', id),
   getItemDetails: (itemId) => ipcRenderer.invoke('get-item-details', itemId), 
   getCategories: () => ipcRenderer.invoke('get-categories'),
+    getItems: () => ipcRenderer.invoke('get-items'),
   checkSkuExists: (sku, excludeId) => ipcRenderer.invoke('check-sku-exists', sku, excludeId),
   checkCategoryExists: (name, excludeId) => ipcRenderer.invoke('check-category-exists', name, excludeId), 
   checkGstExists: (rate, excludeId) => ipcRenderer.invoke('check-gst-exists', rate, excludeId),

@@ -4,7 +4,9 @@ import {
   Search, 
   AlertTriangle,
   RefreshCw,
-  Plus
+  Plus,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const Inventory = () => {
@@ -13,6 +15,11 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [closingStockTotal, setClosingStockTotal] = useState(0);
+
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     loadInventory();
@@ -29,6 +36,7 @@ const Inventory = () => {
     try {
       const data = await window.electronAPI.getInventory();
       setItems(data);
+      setCurrentPage(1); // Reset to first page on load
     } catch (error) {
       console.error('Error loading inventory:', error);
     } finally {
@@ -63,7 +71,67 @@ const Inventory = () => {
     (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const lowStockItems = items.filter(item => item.current_stock < item.minimum_stock);
+  const lowStockItems = filteredItems.filter(item => item.current_stock < item.minimum_stock);
+
+  // --- PAGINATION LOGIC ---
+  useEffect(() => {
+    const total = Math.ceil(filteredItems.length / itemsPerPage);
+    setTotalPages(total);
+    
+    // If current page exceeds total pages after filtering, reset to page 1
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+  }, [filteredItems.length, itemsPerPage, currentPage]);
+
+  // Get current page data
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Pagination handlers
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
+  };
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   if (loading) {
     return (
@@ -84,13 +152,13 @@ const Inventory = () => {
       </div> 
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <Package className="w-8 h-8 text-blue-600" />
             <div className="ml-4">
               <p className="text-sm text-gray-600">Total Items</p>
-              <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredItems.length}</p>
             </div>
           </div>
         </div>
@@ -111,14 +179,14 @@ const Inventory = () => {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Total Value</p>
               <p className="text-2xl font-bold text-gray-900">
-                ₹{items.reduce((sum, item) => sum + (item.current_stock * item.customer_rate), 0).toLocaleString()}
+                ₹{filteredItems.reduce((sum, item) => sum + (item.current_stock * item.customer_rate), 0).toLocaleString()}
               </p>
             </div>
           </div> 
         </div>
 
         {/* Closing Stock Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        {/* <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <Package className="w-8 h-8 text-purple-600" />
             <div className="ml-4">
@@ -128,7 +196,7 @@ const Inventory = () => {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Search */}
@@ -160,6 +228,16 @@ const Inventory = () => {
 
       {/* Inventory Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center">
+            <Package className="w-5 h-5 text-gray-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Inventory Items</h2>
+          </div>
+          <div className="text-sm text-gray-600">
+            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredItems.length)} of {filteredItems.length} items
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -185,15 +263,11 @@ const Inventory = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                  Customer Rate
                 </th>
-                
-                {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Supplier
-                </th> */}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className={item.current_stock < item.minimum_stock ? 'bg-red-50' : ''}>
+              {currentItems.map((item) => (
+                <tr key={item.id} className={item.current_stock < item.minimum_stock ? 'bg-red-50' : 'hover:bg-gray-50'}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <span className="text-sm font-medium text-gray-900">{item.name}</span>
@@ -224,15 +298,95 @@ const Inventory = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">₹{item.customer_rate}</span>
                   </td>
-                 
-                  {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {item.supplier_name || 'N/A'}
-                  </td> */}
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {currentItems.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No items found</p>
+            </div>
+          )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`flex items-center px-3 py-2 rounded-lg mr-2 ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </button>
+              
+              <div className="flex gap-1">
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => goToPage(1)}
+                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && <span className="px-2 py-2">...</span>}
+                  </>
+                )}
+                
+                {getPageNumbers().map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-3 py-2 rounded-lg ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+                
+                {currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <span className="px-2 py-2">...</span>}
+                    <button
+                      onClick={() => goToPage(totalPages)}
+                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`flex items-center px-3 py-2 rounded-lg ml-2 ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </button>
+            </div>
+            
+            <div className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -6,7 +6,9 @@ import {
   RefreshCw,
   TrendingUp,
   TrendingDown,
-  DollarSign
+  DollarSign,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const Ledger = () => {
@@ -18,6 +20,11 @@ const Ledger = () => {
     type: 'all'
   });
 
+  // --- PAGINATION STATE ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+
   useEffect(() => {
     loadTransactions();
   }, [filters]);
@@ -27,6 +34,7 @@ const Ledger = () => {
     try {
       const data = await window.electronAPI.getTransactions(filters);
       setTransactions(data);
+      setCurrentPage(1); // Reset to first page on filter change
     } catch (error) {
       console.error('Error loading transactions:', error);
     } finally {
@@ -49,6 +57,66 @@ const Ledger = () => {
   const getProfit = () => {
     return getTotalSales() - getTotalPurchases();
   };
+
+  // --- PAGINATION LOGIC ---
+  useEffect(() => {
+    const total = Math.ceil(transactions.length / itemsPerPage);
+    setTotalPages(total);
+    
+    // If current page exceeds total pages, reset to page 1
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+  }, [transactions.length, itemsPerPage, currentPage]);
+
+  // Get current page data
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTransactions = transactions.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Pagination handlers
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    
+    return pages;
+  };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters.startDate, filters.endDate, filters.type]);
 
   if (loading) {
     return (
@@ -154,10 +222,13 @@ const Ledger = () => {
 
       {/* Transactions Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center">
             <BookOpen className="w-5 h-5 text-gray-500 mr-2" />
             <h2 className="text-lg font-semibold text-gray-900">Transaction History</h2>
+          </div>
+          <div className="text-sm text-gray-600">
+            Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, transactions.length)} of {transactions.length} transactions
           </div>
         </div>
         
@@ -183,7 +254,7 @@ const Ledger = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {transactions.map((transaction, index) => (
+              {currentTransactions.map((transaction, index) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(transaction.date).toLocaleDateString()}
@@ -213,13 +284,90 @@ const Ledger = () => {
             </tbody>
           </table>
           
-          {transactions.length === 0 && (
+          {currentTransactions.length === 0 && (
             <div className="text-center py-12">
               <BookOpen className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600">No transactions found for the selected period</p>
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className={`flex items-center px-3 py-2 rounded-lg mr-2 ${
+                  currentPage === 1
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </button>
+              
+              <div className="flex gap-1">
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => goToPage(1)}
+                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && <span className="px-2 py-2">...</span>}
+                  </>
+                )}
+                
+                {getPageNumbers().map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-3 py-2 rounded-lg ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+                
+                {currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <span className="px-2 py-2">...</span>}
+                    <button
+                      onClick={() => goToPage(totalPages)}
+                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              <button
+                onClick={goToNextPage}
+                disabled={currentPage === totalPages}
+                className={`flex items-center px-3 py-2 rounded-lg ml-2 ${
+                  currentPage === totalPages
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </button>
+            </div>
+            
+            <div className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

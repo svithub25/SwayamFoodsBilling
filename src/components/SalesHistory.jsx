@@ -73,7 +73,7 @@ const SalesHistory = () => {
   const fetchInventory = async () => {
     try {
       if (window.electronAPI) {
-        const inventory = await window.electronAPI.getInventory();
+        const inventory = await window.electronAPI.getItems();
         setItems(inventory);
       }
     } catch (error) {
@@ -141,6 +141,7 @@ const SalesHistory = () => {
   const loadSalesHistory = async () => {
     try {
       const data = await window.electronAPI.getSalesHistory(); 
+      console.log('Fetched sales history:', data);
       data.sort((a, b) => {
         const getBillNum = bill => {
           const parts = bill.split('/');
@@ -667,7 +668,7 @@ const SalesHistory = () => {
             />
           </div>
            
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Item</label>
             <select
               value={filters.item}
@@ -681,7 +682,7 @@ const SalesHistory = () => {
                 </option>
               ))}
             </select>
-          </div>
+          </div> */}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Salesman</label>

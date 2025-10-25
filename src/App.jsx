@@ -45,14 +45,16 @@ const App = () => {
   useHotkeys("ctrl+d", () => navigate("/dashboard"), [navigate]);
   useHotkeys("ctrl+i", () => navigate("/inventory"), [navigate]);
   useHotkeys("ctrl+p", () => navigate("/purchase"), [navigate]);
+  useHotkeys("ctrl+o", () => navigate("/purchase-order"), [navigate]);
   useHotkeys("ctrl+b", () => navigate("/billing"), [navigate]);
-  useHotkeys("ctrl+s", () => navigate("/sales-history"), [navigate]);
+  useHotkeys("ctrl+h", () => navigate("/sales-history"), [navigate]);
+  useHotkeys("ctrl+s", () => navigate("/salesman-commission"), [navigate]);
   useHotkeys("ctrl+l", () => navigate("/ledger"), [navigate]);
+  useHotkeys("ctrl+y", () => navigate("/analytics"), [navigate]);
   useHotkeys("ctrl+e", () => navigate("/export"), [navigate]);
-  useHotkeys("ctrl+shift+b", () => navigate("/backup"), [navigate]);
-  useHotkeys("ctrl+shift+a", () => navigate("/admin"), [navigate]);
-  useHotkeys("ctrl+shift+o", () => navigate("/purchase-order"), [navigate]);
-  useHotkeys("ctrl+shift+x", () => navigate("/analytics"), [navigate]);
+  useHotkeys("ctrl+n", () => navigate("/admin"), [navigate]);
+  useHotkeys("ctrl+k", () => navigate("/banking"), [navigate]);
+  
   // useHotkeys("ctrl+t", () => {setShowShortcutHelp(true);
   //  console.log("Shortcut Help Opened");  
   // }, [setShowShortcutHelp]);
@@ -105,7 +107,7 @@ const App = () => {
                 <Route path="/export" element={<Export />} />
                 <Route path="/backup" element={<Backup />} />  
                 <Route path="/analytics" element={<Analytics />} />  
-                 {/* <Route path="/analytics" element={<ComingSoon />} />  */}
+                 <Route path="/banking" element={<ComingSoon />} /> 
                 <Route path="/admin" element={<Admin />} /> 
                 <Route path="/item/:id" element={<ItemDetails />} />
                 <Route path="/purchase/:id" element={<PurchaseDetails />} />
