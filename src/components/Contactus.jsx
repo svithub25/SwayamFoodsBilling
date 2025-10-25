@@ -79,7 +79,7 @@ const Contactus = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Address</h3>
                     <p className="text-gray-600 leading-relaxed">
-                      Plot No. 18<br />
+                      Plot No. 18, Dnyaanaraj<br />
                       Sangam Colony<br />        
                       Amrut Nagar Sarnobatwadi<br /> 
                       
