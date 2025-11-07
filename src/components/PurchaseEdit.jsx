@@ -333,7 +333,7 @@ const getFilteredItems = (search) =>
     // --- END NEW ---
 
     try {
-      await window.electronAPI.updatePurchase(id, {
+      const data =  await window.electronAPI.updatePurchase(id, {
         ...purchaseForm,
         items: itemsWithGST,
         cgst_total,
@@ -341,10 +341,12 @@ const getFilteredItems = (search) =>
         rounding_off,
         total_amount: grandTotal
       });
-      toast.success('Purchase updated successfully!');
+      console.log('the saadasdasdad',data);
+      toast.success('Purchase updated successfully!'); 
       navigate('/purchase');
     } catch (error) {
       toast.error('Error updating purchase: ' + error);
+      
     }
   };
 

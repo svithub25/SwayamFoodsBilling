@@ -72,7 +72,8 @@ const channelGroups = {
     getSalesmanCommission: 'get-Salesman-Commission'
   },
   transactions: {
-    getTransactions: 'get-transactions'
+    getTransactions: 'get-transactions',
+    getTransactionDetails: 'get-transaction-details'
   },
   analytics: {
     getAnalyticsData: 'get-analytics-data'
@@ -149,4 +150,3 @@ electronAPI.getExportPurchaseData = (startDateOrParams, maybeEndDate) => {
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-

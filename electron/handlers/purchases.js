@@ -144,77 +144,141 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
 
   ipcMain.handle('update-purchase', async (event, purchaseId, updatedPurchase) => {
     const db = getDb();
-    const oldItems = db.prepare('SELECT * FROM purchase_items WHERE purchase_id = ?').all(purchaseId);
-    const oldMap = {};
-    oldItems.forEach((item) => {
-      oldMap[item.item_id] = item;
-    });
-    const newMap = {};
-    updatedPurchase.items.forEach((item) => {
-      newMap[item.id] = item;
-    });
+    
+    try {
+      db.prepare('BEGIN TRANSACTION').run();
 
-    for (const oldItem of oldItems) {
-      const newItem = newMap[oldItem.item_id];
-      if (!newItem) {
-        db.prepare('UPDATE items SET current_stock = current_stock - ? WHERE id = ?').run(oldItem.quantity, oldItem.item_id);
-      } else if (newItem.quantity !== oldItem.quantity) {
-        db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?')
-          .run(newItem.quantity - oldItem.quantity, oldItem.item_id);
+      const oldItems = db.prepare('SELECT * FROM purchase_items WHERE purchase_id = ?').all(purchaseId);
+      const oldMap = new Map();
+      oldItems.forEach((item) => {
+        oldMap.set(item.item_id, item);
+      });
+
+      const newMap = new Map();
+      updatedPurchase.items.forEach((item) => {
+        newMap.set(item.id, item);
+      });
+
+      // Adjust stock
+      for (const oldItem of oldItems) {
+        const newItem = newMap.get(oldItem.item_id);
+        if (!newItem) {
+          db.prepare('UPDATE items SET current_stock = current_stock - ? WHERE id = ?')
+            .run(oldItem.quantity, oldItem.item_id);
+        } else if (newItem.quantity !== oldItem.quantity) {
+          db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?')
+            .run(newItem.quantity - oldItem.quantity, oldItem.item_id);
+        }
       }
-    }
 
-    for (const newItem of updatedPurchase.items) {
-      if (!oldMap[newItem.id]) {
-        db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?').run(newItem.quantity, newItem.id);
+      for (const newItem of updatedPurchase.items) {
+        if (!oldMap.has(newItem.id)) {
+          db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?')
+            .run(newItem.quantity, newItem.id);
+        }
       }
-    }
 
-    db.prepare(`
-      UPDATE purchases SET
-        supplier_id = ?,
-        invoice_number = ?,
-        purchase_date = ?,
-        total_amount = ?,
-        cgst_total = ?,
-        sgst_total = ?,
-        rounding_off = ?
-      WHERE id = ?
-    `).run(
-      updatedPurchase.supplier_id,
-      updatedPurchase.invoice_number,
-      updatedPurchase.purchase_date,
-      updatedPurchase.total_amount,
-      updatedPurchase.cgst_total,
-      updatedPurchase.sgst_total,
-      updatedPurchase.rounding_off,
-      purchaseId
-    );
-
-    db.prepare('DELETE FROM purchase_items WHERE purchase_id = ?').run(purchaseId);
-
-    const purchaseItemStmt = db.prepare(`
-      INSERT INTO purchase_items
-        (purchase_id, item_id, quantity, unit_price, gst_percentage, cgst_amount, sgst_amount, total_price)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    updatedPurchase.items.forEach((item) => {
-      purchaseItemStmt.run(
-        purchaseId,
-        item.id,
-        item.quantity,
-        item.unit_price,
-        item.gst_percentage,
-        item.cgst_amount,
-        item.sgst_amount,
-        item.total_price
+      // Update purchase header
+      db.prepare(`
+        UPDATE purchases SET
+          supplier_id = ?,
+          invoice_number = ?,
+          purchase_date = ?,
+          total_amount = ?,
+          cgst_total = ?,
+          sgst_total = ?,
+          rounding_off = ?,
+          discount = ?
+        WHERE id = ?
+      `).run(
+        updatedPurchase.supplier_id,
+        updatedPurchase.invoice_number,
+        updatedPurchase.purchase_date,
+        updatedPurchase.total_amount,
+        updatedPurchase.cgst_total,
+        updatedPurchase.sgst_total,
+        updatedPurchase.rounding_off,
+        updatedPurchase.discount || 0,
+        purchaseId
       );
-      db.prepare('UPDATE items SET purchase_rate = ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?')
-        .run(item.unit_price, updatedPurchase.supplier_id, updatedPurchase.purchase_date, item.id);
-    });
 
-    return { success: true };
+      // UPDATE existing items or INSERT new ones
+      const updateStmt = db.prepare(`
+        UPDATE purchase_items SET
+          quantity = ?,
+          unit_price = ?,
+          gst_percentage = ?,
+          cgst_amount = ?,
+          sgst_amount = ?,
+          total_price = ?,
+          discount = ?
+        WHERE purchase_id = ? AND item_id = ?
+      `);
+
+      const insertStmt = db.prepare(`
+        INSERT INTO purchase_items
+          (purchase_id, item_id, quantity, unit_price, gst_percentage, cgst_amount, sgst_amount, total_price, discount)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      updatedPurchase.items.forEach((item) => {
+        const oldItem = oldMap.get(item.id);
+        
+        if (oldItem) {
+          // Update existing item
+          updateStmt.run(
+            item.quantity,
+            item.unit_price,
+            item.gst_percentage || 0,
+            item.cgst_amount || 0,
+            item.sgst_amount || 0,
+            item.total_price,
+            item.discount || 0,
+            purchaseId,
+            item.id
+          );
+        } else {
+          // Insert new item
+          insertStmt.run(
+            purchaseId,
+            item.id,
+            item.quantity,
+            item.unit_price,
+            item.gst_percentage || 0,
+            item.cgst_amount || 0,
+            item.sgst_amount || 0,
+            item.total_price,
+            item.discount || 0
+          );
+        }
+        
+        // Update item's last purchase info
+        db.prepare('UPDATE items SET purchase_rate = ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?')
+          .run(item.unit_price, updatedPurchase.supplier_id, updatedPurchase.purchase_date, item.id);
+      });
+
+      // Mark removed items as deleted (soft delete) instead of hard delete
+      for (const oldItem of oldItems) {
+        if (!newMap.has(oldItem.item_id)) {
+          db.prepare('UPDATE purchase_items SET status_code = 1 WHERE id = ?').run(oldItem.id);
+          // Also delete associated cost allocations
+          db.prepare('DELETE FROM sale_item_cost_allocation WHERE purchase_item_id = ?').run(oldItem.id);
+        }
+      }
+
+      db.prepare('COMMIT').run();
+      return { success: true };
+      
+    } catch (error) {
+      try {
+        db.prepare('ROLLBACK').run();
+      } catch (rollbackError) {
+        console.error('Rollback error:', rollbackError);
+      }
+      
+      console.error('Update purchase error:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('check-purchase-edit-stock', async (event, purchaseId, updatedItems) => {

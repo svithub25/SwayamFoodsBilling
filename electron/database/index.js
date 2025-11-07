@@ -254,6 +254,20 @@ CREATE TABLE IF NOT EXISTS closing_stock (
     is_print INTEGER DEFAULT 0,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+   
+
+CREATE TABLE IF NOT EXISTS sale_item_cost_allocation (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_item_id INTEGER NOT NULL,
+  purchase_item_id INTEGER NOT NULL,
+  quantity_allocated REAL NOT NULL,
+  purchase_rate REAL NOT NULL,
+  cost_amount REAL NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (sale_item_id) REFERENCES sale_items (id),
+  FOREIGN KEY (purchase_item_id) REFERENCES purchase_items (id)
+);
+ 
 
   `);
 
