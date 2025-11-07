@@ -1,138 +1,152 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const channelGroups = {
+  app: {
+    getAppInfo: 'get-app-info'
+  },
+  auth: {
+    login: 'login',
+    verifyPin: 'verify-pin',
+    verifyApprovePin: 'verify-approve-pin'
+  },
+  dashboard: {
+    getDashboardData: 'get-dashboard-data'
+  },
+  inventory: {
+    getInventory: 'get-inventory',
+    addItem: 'add-item',
+    updateItem: 'update-item',
+    deleteItem: 'delete-item',
+    getItemDetails: 'get-item-details',
+    getItems: 'get-items',
+    checkSkuExists: 'check-sku-exists',
+    checkCategoryExists: 'check-category-exists',
+    checkGstExists: 'check-gst-exists',
+    getItemPurchaseHistory: 'get-item-purchase-history',
+    getNextSku: 'get-next-sku'
+  },
+  categories: {
+    getCategories: 'get-categories',
+    addCategory: 'add-category',
+    deleteCategory: 'delete-category'
+  },
+  suppliers: {
+    getSuppliers: 'get-suppliers',
+    addSupplier: 'add-supplier',
+    updateSupplier: 'update-supplier',
+    deleteSupplier: 'delete-supplier'
+  },
+  units: {
+    getUnits: 'get-units',
+    addUnit: 'add-unit',
+    deleteUnit: 'delete-unit'
+  },
+  gst: {
+    getGstRates: 'get-gst-rates',
+    addGstRate: 'add-gst-rate',
+    deleteGstRate: 'delete-gst-rate'
+  },
+  purchases: {
+    savePurchase: 'save-purchase',
+    getPurchaseHistory: 'get-purchase-history',
+    getPurchaseDetails: 'get-purchase-details',
+    getPurchaseFullDetails: 'get-purchase-full-details',
+    generatePurchaseOrderPdf: 'generate-purchase-order-pdf',
+    updatePurchase: 'update-purchase',
+    checkPurchaseEditStock: 'check-purchase-edit-stock',
+    checkPurchaseDeleteStock: 'check-purchase-delete-stock',
+    deletePurchase: 'delete-purchase'
+  },
+  sales: {
+    generateBillNumber: 'generate-bill-number',
+    saveSale: 'save-sale',
+    updateSale: 'update-sale',
+    deleteBill: 'delete-bill',
+    getSaleDetails: 'get-sale-details',
+    getFilteredSales: 'get-filtered-sales',
+    updateSalePaidStatus: 'update-sale-paid-status',
+    updateSaleApprovedStatus: 'update-sale-approved-status',
+    getSalesHistory: 'get-sales-history',
+    getSalePaymentForApproval: 'get-sale-payment-for-approval',
+    getApprovalHistory: 'get-approval-history',
+    getSalesmanCommission: 'get-Salesman-Commission'
+  },
+  transactions: {
+    getTransactions: 'get-transactions'
+  },
+  analytics: {
+    getAnalyticsData: 'get-analytics-data'
+  },
+  backup: {
+    backupDatabase: 'backup-database',
+    restoreDatabase: 'restore-database',
+    getLastBackupDate: 'get-last-backup-date'
+  },
+  database: {
+    getDatabaseSize: 'get-database-size'
+  },
+  customers: {
+    createCustomerIfNeeded: 'create-customer-if-needed',
+    getCustomers: 'get-customers',
+    addCustomer: 'add-customer',
+    updateCustomer: 'update-customer',
+    deleteCustomer: 'delete-customer'
+  },
+  salesmen: {
+    addSalesman: 'add-salesman',
+    getSalesmen: 'get-salesmen',
+    updateSalesman: 'update-salesman',
+    deleteSalesman: 'delete-salesman'
+  },
+  payments: {
+    savePayment: 'save-payment',
+    getPaymentDetails: 'get-payment-details',
+    updatePaymentStatus: 'update-payment-status',
+    savePurchasePayment: 'save-purchase-payment',
+    getPurchasePaymentDetails: 'get-purchase-payment-details'
+  },
+  exports: {
+    getExportInventoryData: 'get-export-inventory-data',
+    getExportSalesData: 'get-export-sales-data',
+    getExportPurchaseData: 'get-export-purchase-data'
+  },
+  closingStock: {
+    updateClosingStock: 'update-closing-stock',
+    getClosingStock: 'get-closing-stock'
+  },
+  messages: {
+    getBillMessage: 'get-bill-message',
+    setBillMessage: 'set-bill-message'
+  },
+  printing: {
+    printPdf: 'print-pdf'
+  }
+};
 
-contextBridge.exposeInMainWorld('electronAPI', { 
+const createInvoker = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
 
+const electronAPI = Object.entries(channelGroups).reduce((api, [, channels]) => {
+  Object.entries(channels).forEach(([name, channel]) => {
+    api[name] = createInvoker(channel);
+  });
+  return api;
+}, {});
 
+electronAPI.getExportSalesData = (startDateOrParams, maybeEndDate) => {
+  const payload =
+    typeof startDateOrParams === 'object'
+      ? startDateOrParams
+      : { startDate: startDateOrParams, endDate: maybeEndDate };
+  return ipcRenderer.invoke('get-export-sales-data', payload);
+};
 
- getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+electronAPI.getExportPurchaseData = (startDateOrParams, maybeEndDate) => {
+  const payload =
+    typeof startDateOrParams === 'object'
+      ? startDateOrParams
+      : { startDate: startDateOrParams, endDate: maybeEndDate };
+  return ipcRenderer.invoke('get-export-purchase-data', payload);
+};
 
-
-  // Authentication
-  login: (username, password) => ipcRenderer.invoke('login', username, password),
-  verifyPin: (pin) => ipcRenderer.invoke('verify-pin', pin),
-
-  // Dashboard
-  getDashboardData: () => ipcRenderer.invoke('get-dashboard-data'),
-
-  // Inventory
-  getInventory: () => ipcRenderer.invoke('get-inventory'),
-  addItem: (itemData) => ipcRenderer.invoke('add-item', itemData),
-  updateItem: (itemData) => ipcRenderer.invoke('update-item', itemData),
-  deleteItem: (id) => ipcRenderer.invoke('delete-item', id),
-  getItemDetails: (itemId) => ipcRenderer.invoke('get-item-details', itemId), 
-  getCategories: () => ipcRenderer.invoke('get-categories'),
-    getItems: () => ipcRenderer.invoke('get-items'),
-  checkSkuExists: (sku, excludeId) => ipcRenderer.invoke('check-sku-exists', sku, excludeId),
-  checkCategoryExists: (name, excludeId) => ipcRenderer.invoke('check-category-exists', name, excludeId), 
-  checkGstExists: (rate, excludeId) => ipcRenderer.invoke('check-gst-exists', rate, excludeId),
-
-  // Suppliers
-  getSuppliers: () => ipcRenderer.invoke('get-suppliers'),   
-  addSupplier: (supplierData) => ipcRenderer.invoke('add-supplier', supplierData),
-  updateSupplier: (supplierData) => ipcRenderer.invoke('update-supplier', supplierData),
-  deleteSupplier: (id) => ipcRenderer.invoke('delete-supplier', id),
-
-  // Units
-  getUnits: () => ipcRenderer.invoke('get-units'),
-  addUnit: (unitData) => ipcRenderer.invoke('add-unit', unitData),
-  deleteUnit: (id) => ipcRenderer.invoke('delete-unit', id),
-
-  // GST Rates
-  getGstRates: () => ipcRenderer.invoke('get-gst-rates'),
-  addGstRate: (gstData) => ipcRenderer.invoke('add-gst-rate', gstData),
-  deleteGstRate: (id) => ipcRenderer.invoke('delete-gst-rate', id),
-
-  // Purchases
-  savePurchase: (purchaseData) => ipcRenderer.invoke('save-purchase', purchaseData),
-  getPurchaseHistory: () => ipcRenderer.invoke('get-purchase-history'),
-  getPurchaseDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-details', purchaseId),
-  getPurchaseFullDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-full-details', purchaseId),
-  generatePurchaseOrderPdf: (orderData) => ipcRenderer.invoke('generate-purchase-order-pdf', orderData),
-  updatePurchase: (purchaseId, purchaseData) => ipcRenderer.invoke('update-purchase', purchaseId, purchaseData),
-  checkPurchaseEditStock: (purchaseId, items) => ipcRenderer.invoke('check-purchase-edit-stock', purchaseId, items),
-  checkPurchaseDeleteStock: (purchaseId) => ipcRenderer.invoke('check-purchase-delete-stock', purchaseId),
-
-  // Sales
-  generateBillNumber: () => ipcRenderer.invoke('generate-bill-number'),
-  saveSale: (saleData) => ipcRenderer.invoke('save-sale', saleData),
-  getSaleDetails: (saleId) => ipcRenderer.invoke('get-sale-details', saleId),
-  getFilteredSales: (filters) => ipcRenderer.invoke('get-filtered-sales', filters),
-  getItemPurchaseHistory: (itemId) => ipcRenderer.invoke('get-item-purchase-history', itemId),
-  updateSale: (saleId, saleData) => ipcRenderer.invoke('update-sale', saleId, saleData),
-  deleteBill: (billId) => ipcRenderer.invoke('delete-bill', billId),
-  deletePurchase: (billId) => ipcRenderer.invoke('delete-purchase', billId),
-  updateSalePaidStatus: (saleId, isPaid) => ipcRenderer.invoke('update-sale-paid-status', saleId, isPaid),
-  updateSaleApprovedStatus: (saleId, isApproved) => ipcRenderer.invoke('update-sale-approved-status', saleId, isApproved),
-  printPdf: (pdfData) => ipcRenderer.invoke('print-pdf', pdfData),
-
-  // Transactions
-  getTransactions: (filters) => ipcRenderer.invoke('get-transactions', filters),
-
-  // Backup
-  backupDatabase: () => ipcRenderer.invoke('backup-database'),
-  restoreDatabase: () => ipcRenderer.invoke('restore-database'),
-  getLastBackupDate: () => ipcRenderer.invoke('get-last-backup-date'),
-
-  // Analytics
-  getAnalyticsData: (filters) => ipcRenderer.invoke('get-analytics-data', filters),
-  getSalesHistory: () => ipcRenderer.invoke('get-sales-history'),
-
-  // Categories
-  addCategory: (categoryData) => ipcRenderer.invoke('add-category', categoryData),
-  deleteCategory: (id) => ipcRenderer.invoke('delete-category', id),
-
-  // Database
-  getDatabaseSize: () => ipcRenderer.invoke('get-database-size'),
-
-  // Customers
-  createCustomerIfNeeded: (customer) => ipcRenderer.invoke('create-customer-if-needed', customer),
-  getCustomers: () => ipcRenderer.invoke('get-customers'),
-  addCustomer: (customer) => ipcRenderer.invoke('add-customer', customer),
-  updateCustomer: (customer) => ipcRenderer.invoke('update-customer', customer),
-  deleteCustomer: (id) => ipcRenderer.invoke('delete-customer', id),
-
-//salesman 
-
-addSalesman: (salesmanData) => ipcRenderer.invoke('add-salesman', salesmanData),
-getSalesmen: () => ipcRenderer.invoke('get-salesmen'),
-updateSalesman: (salesmanData) => ipcRenderer.invoke('update-salesman', salesmanData),
-deleteSalesman: (id) => ipcRenderer.invoke('delete-salesman', id),
-
-verifyApprovePin: (pin) => ipcRenderer.invoke('verify-approve-pin', pin),
-
-  // Payments
-  savePayment: (paymentData) => ipcRenderer.invoke('save-payment', paymentData),
-  getPaymentDetails: (saleId) => ipcRenderer.invoke('get-payment-details', saleId),
-  updatePaymentStatus: (paymentVerificationId, status) => ipcRenderer.invoke('update-payment-status', paymentVerificationId, status),
-  // Add these to your contextBridge.exposeInMainWorld('electronAPI', {
-getSalePaymentForApproval: (saleId) => ipcRenderer.invoke('get-sale-payment-for-approval', saleId),
-getApprovalHistory: (saleId) => ipcRenderer.invoke('get-approval-history', saleId),
-// Add these to your contextBridge.exposeInMainWorld('electronAPI', {
-savePurchasePayment: (paymentData) => ipcRenderer.invoke('save-purchase-payment', paymentData),
-getPurchasePaymentDetails: (purchaseId) => ipcRenderer.invoke('get-purchase-payment-details', purchaseId),
-
- 
-
-  getExportInventoryData: () => ipcRenderer.invoke('get-export-inventory-data'),
-    getExportSalesData: (startDate, endDate) => ipcRenderer.invoke('get-export-sales-data', startDate, endDate),
-      getExportPurchaseData: (startDate, endDate) => ipcRenderer.invoke('get-export-purchase-data', startDate, endDate),
-    
-getNextSku: () => ipcRenderer.invoke('get-next-sku'),
-// ...existing code...
-getSalesmanCommission: () => ipcRenderer.invoke('get-Salesman-Commission'),
-// ...existing code...
-
-
-//closing stock 
-  updateClosingStock: (data) => ipcRenderer.invoke('update-closing-stock', data),
-  getClosingStock: (itemId) => ipcRenderer.invoke('get-closing-stock', itemId),
-  
-
-
-
-
-
-
-});
+contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 

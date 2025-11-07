@@ -1,0 +1,65 @@
+import { registerAuthHandlers } from './auth.js';
+import { registerDashboardHandlers } from './dashboard.js';
+import { registerInventoryHandlers } from './inventory.js';
+import { registerCatalogHandlers } from './catalog.js';
+import { registerSupplierHandlers } from './suppliers.js';
+import { registerPurchaseHandlers } from './purchases.js';
+import { registerSalesHandlers } from './sales.js';
+import { registerTransactionHandlers, registerAnalyticsHandlers } from './reports.js';
+import { registerCustomerHandlers } from './customers.js';
+import { registerSalesmanHandlers } from './salesmen.js';
+import { registerPaymentHandlers } from './payments.js';
+import { registerExportHandlers } from './exports.js';
+import { registerBillMessageHandlers } from './messages.js';
+import { registerPrintingHandler } from './printing.js';
+import { registerAppInfoHandler } from './appInfo.js';
+import { registerClosingStockHandlers, createClosingStockReducer } from './closingStock.js';
+
+export function registerAllHandlers(context) {
+  const {
+    ipcMain,
+    getDb,
+    dialog,
+    shell,
+    mainWindow,
+    isDev,
+    paths,
+    app,
+    machineId,
+    backupManager,
+    licenseManager
+  } = context;
+
+  registerAuthHandlers({ ipcMain, getDb });
+  registerDashboardHandlers({ ipcMain, getDb });
+  registerInventoryHandlers({ ipcMain, getDb });
+  registerCatalogHandlers({ ipcMain, getDb });
+  registerSupplierHandlers({ ipcMain, getDb });
+  registerCustomerHandlers({ ipcMain, getDb });
+  registerSalesmanHandlers({ ipcMain, getDb });
+
+  const reduceClosingStock = createClosingStockReducer(getDb);
+  registerClosingStockHandlers({ ipcMain, getDb });
+
+  registerPurchaseHandlers({ ipcMain, getDb });
+  registerSalesHandlers({ ipcMain, getDb, reduceClosingStock });
+  registerPaymentHandlers({ ipcMain, getDb });
+
+  registerTransactionHandlers({ ipcMain, getDb });
+  registerAnalyticsHandlers({ ipcMain, getDb });
+  registerExportHandlers({ ipcMain, getDb });
+
+  registerBillMessageHandlers({ ipcMain, getDb });
+  registerPrintingHandler({ ipcMain, shell });
+  registerAppInfoHandler({ ipcMain, app, packageJsonPath: paths.packageJson });
+
+  if (backupManager) {
+    // backup handlers registered via manager during creation
+  }
+
+  if (licenseManager) {
+    // license manager handled registration during creation
+  }
+}
+
+
