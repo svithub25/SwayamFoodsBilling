@@ -59,7 +59,7 @@ const Analytics = () => {
       const [sales, purchases, inventory, salesHistory, purchaseHistory] = await Promise.all([
         window.electronAPI.getFilteredSales(dateRange),
         window.electronAPI.getPurchaseHistory(),
-        window.electronAPI.getInventory(),
+        window.electronAPI.getInventory(), // This already has category_name joined
         window.electronAPI.getSalesHistory(),
         window.electronAPI.getPurchaseHistory()
       ]);
@@ -78,11 +78,14 @@ const Analytics = () => {
         const saleDetails = await window.electronAPI.getSaleDetails(sale.id);
         if (saleDetails && saleDetails.items) {
           saleDetails.items.forEach(item => {
+            // Find the inventory item to get category
+            const invItem = inventory.find(i => i.id === item.item_id);
             saleItemsDetailed.push({
               ...item,
               sale_date: sale.sale_date,
               bill_number: sale.bill_number,
-              customer_name: sale.customer_name
+              customer_name: sale.customer_name,
+              category_name: invItem?.category_name || 'Uncategorized'
             });
           });
         }
@@ -94,11 +97,14 @@ const Analytics = () => {
         const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchase.id);
         if (purchaseDetails && purchaseDetails.items) {
           purchaseDetails.items.forEach(item => {
+            // Find the inventory item to get category
+            const invItem = inventory.find(i => i.id === item.item_id);
             purchaseItemsDetailed.push({
               ...item,
               purchase_date: purchase.purchase_date,
               invoice_number: purchase.invoice_number,
-              supplier_name: purchase.supplier_name
+              supplier_name: purchase.supplier_name,
+              category_name: invItem?.category_name || 'Uncategorized'
             });
           });
         }
@@ -222,36 +228,130 @@ const Analytics = () => {
       vendorStats[vendor].total += purchase.total_amount || 0;
     });
 
-    // Customer Analysis
+    // Customer Analysis (Enhanced)
     const customerStats = {};
     sales.forEach(sale => {
       const customer = sale.customer_name || 'Walk-in';
       if (!customerStats[customer]) {
-        customerStats[customer] = { count: 0, total: 0, name: customer };
+        customerStats[customer] = { 
+          count: 0, 
+          total: 0, 
+          name: customer,
+          totalItems: 0,
+          avgOrderValue: 0,
+          transactions: []
+        };
       }
       customerStats[customer].count++;
       customerStats[customer].total += sale.total_amount || 0;
+      customerStats[customer].transactions.push({
+        date: sale.sale_date,
+        billNumber: sale.bill_number,
+        amount: sale.total_amount
+      });
     });
 
-    // Daily Trends
+    // Calculate customer metrics
+    Object.values(customerStats).forEach(customer => {
+      customer.avgOrderValue = customer.count > 0 ? customer.total / customer.count : 0;
+    });
+
+    // Add items per customer
+    saleItems.forEach(item => {
+      const customer = item.customer_name || 'Walk-in';
+      if (customerStats[customer]) {
+        customerStats[customer].totalItems += item.quantity;
+      }
+    });
+
+    // Category Analysis - FIXED
+    const categoryStats = {};
+    
+    // Group items by category from inventory (inventory already has category_name from JOIN)
+    inventory.forEach(item => {
+      const category = item.category_name || 'Uncategorized';
+      if (!categoryStats[category]) {
+        categoryStats[category] = {
+          category: category,
+          totalItems: 0,
+          totalStock: 0,
+          stockValue: 0,
+          itemsSold: 0,
+          salesRevenue: 0,
+          itemsPurchased: 0,
+          purchaseCost: 0,
+          items: []
+        };
+      }
+      categoryStats[category].totalItems++;
+      categoryStats[category].totalStock += item.current_stock;
+      categoryStats[category].stockValue += item.current_stock * item.customer_rate;
+      categoryStats[category].items.push(item.name);
+    });
+
+    // Add sales data to categories - use category_name from saleItems
+    saleItems.forEach(item => {
+      const category = item.category_name || 'Uncategorized';
+      
+      if (!categoryStats[category]) {
+        categoryStats[category] = {
+          category: category,
+          totalItems: 0,
+          totalStock: 0,
+          stockValue: 0,
+          itemsSold: 0,
+          salesRevenue: 0,
+          itemsPurchased: 0,
+          purchaseCost: 0,
+          items: []
+        };
+      }
+      
+      categoryStats[category].itemsSold += item.quantity;
+      categoryStats[category].salesRevenue += item.quantity * item.unit_price;
+    });
+
+    // Add purchase data to categories - use category_name from purchaseItems
+    purchaseItems.forEach(item => {
+      const category = item.category_name || 'Uncategorized';
+      
+      if (!categoryStats[category]) {
+        categoryStats[category] = {
+          category: category,
+          totalItems: 0,
+          totalStock: 0,
+          stockValue: 0,
+          itemsSold: 0,
+          salesRevenue: 0,
+          itemsPurchased: 0,
+          purchaseCost: 0,
+          items: []
+        };
+      }
+      
+      categoryStats[category].itemsPurchased += item.quantity;
+      categoryStats[category].purchaseCost += item.quantity * item.unit_price;
+    });
+
+    // Daily Trends Analysis
     const dailyData = {};
+    
+    // Process sales by date
     sales.forEach(sale => {
       const date = sale.sale_date;
       if (!dailyData[date]) {
-        dailyData[date] = { sales: 0, orders: 0, date };
+        dailyData[date] = { date, sales: 0, purchases: 0 };
       }
       dailyData[date].sales += sale.total_amount || 0;
-      dailyData[date].orders++;
     });
 
+    // Process purchases by date
     purchases.forEach(purchase => {
       const date = purchase.purchase_date;
       if (!dailyData[date]) {
-        dailyData[date] = { purchases: 0, purchaseOrders: 0, date };
-      } else {
-        dailyData[date].purchases = (dailyData[date].purchases || 0) + (purchase.total_amount || 0);
-        dailyData[date].purchaseOrders = (dailyData[date].purchaseOrders || 0) + 1;
+        dailyData[date] = { date, sales: 0, purchases: 0 };
       }
+      dailyData[date].purchases += purchase.total_amount || 0;
     });
 
     return {
@@ -269,7 +369,9 @@ const Analytics = () => {
         outOfStockItems,
         totalItems: inventory.length,
         totalItemsSold: Object.values(itemSalesMap).reduce((sum, i) => sum + i.total_quantity, 0),
-        totalItemsPurchased: Object.values(itemPurchaseMap).reduce((sum, i) => sum + i.total_quantity, 0)
+        totalItemsPurchased: Object.values(itemPurchaseMap).reduce((sum, i) => sum + i.total_quantity, 0),
+        totalCustomers: Object.keys(customerStats).length,
+        totalCategories: Object.keys(categoryStats).length
       },
       inventory: inventory.map(item => ({
         ...item,
@@ -285,6 +387,7 @@ const Analytics = () => {
         .slice(0, 10),
       vendors: Object.values(vendorStats).sort((a, b) => b.total - a.total),
       customers: Object.values(customerStats).sort((a, b) => b.total - a.total),
+      categories: Object.values(categoryStats).sort((a, b) => b.salesRevenue - a.salesRevenue),
       dailyTrends: Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date)),
       sales,
       purchases,
@@ -425,7 +528,7 @@ const Analytics = () => {
     );
   }
 
-  const { summary, itemAnalytics, topSellingItems, topPurchasedItems, vendors, customers, dailyTrends, inventory: inventoryData } = analyticsData;
+  const { summary, itemAnalytics, topSellingItems, topPurchasedItems, vendors, customers, categories, dailyTrends, inventory: inventoryData } = analyticsData;
 
   return (
     <div className="space-y-6">
@@ -489,14 +592,16 @@ const Analytics = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-4 px-6 overflow-x-auto">
-            {[
-              { id: 'overview', name: 'Overview' },
+            {[{
+              id: 'overview', name: 'Overview' },
               { id: 'items', name: 'Item Analysis' },
+              { id: 'customers', name: 'Customer Analysis' },
+              { id: 'categories', name: 'Category Analysis' },
               { id: 'sales', name: 'Sales Details' },
               { id: 'purchases', name: 'Purchase Details' }
             ].map(tab => (
               <button
-                key={tab.id}
+                key={tab.id} 
                 onClick={() => setActiveView(tab.id)}
                 className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
                   activeView === tab.id
@@ -721,6 +826,159 @@ const Analytics = () => {
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">{purchase.invoice_number}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{purchase.supplier_name || 'Unknown'}</td>
                           <td className="px-6 py-4 text-sm font-semibold text-red-600">₹{formatINR(purchase.total_amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div> 
+              </div>
+            </div>
+          )}
+
+          {/* Customer Analysis */}
+          {activeView === 'customers' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900">Customer-wise Analysis</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                  <p className="text-sm font-medium text-blue-600">Total Customers</p>
+                  <p className="text-3xl font-bold text-blue-900">{summary.totalCustomers}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                  <p className="text-sm font-medium text-green-600">Total Revenue</p>
+                  <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                  <p className="text-sm font-medium text-purple-600">Avg per Customer</p>
+                  <p className="text-3xl font-bold text-purple-900">
+                    ₹{formatINR(summary.totalCustomers > 0 ? summary.totalSales / summary.totalCustomers : 0)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Top Customers Chart */}
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold mb-4">Top 10 Customers by Revenue</h3>
+                <Bar
+                  data={{
+                    labels: customers.slice(0, 10).map(c => c.name),
+                    datasets: [{
+                      label: 'Total Revenue (₹)',
+                      data: customers.slice(0, 10).map(c => c.total),
+                      backgroundColor: 'rgba(59, 130, 246, 0.7)'
+                    }]
+                  }}
+                  options={{ 
+                    responsive: true,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } }
+                  }}
+                />
+              </div>
+
+              {/* Customer Details Table */}
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                  <h3 className="font-semibold">Detailed Customer Statistics</h3>
+                </div>
+                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Name</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Orders</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Revenue</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Order Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {customers.map((customer, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer.name}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{customer.count}</td>
+                          <td className="px-6 py-4 text-sm text-green-600 font-semibold">₹{formatINR(customer.total)}</td>
+                          <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{customer.totalItems}</td>
+                          <td className="px-6 py-4 text-sm text-purple-600 font-semibold">₹{formatINR(customer.avgOrderValue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Category Analysis */}
+          {activeView === 'categories' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900">Category-wise Analysis</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
+                  <p className="text-sm font-medium text-indigo-600">Total Categories</p>
+                  <p className="text-3xl font-bold text-indigo-900">{summary.totalCategories}</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                  <p className="text-sm font-medium text-green-600">Total Stock Value</p>
+                  <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalInventoryValue)}</p>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                  <p className="text-sm font-medium text-blue-600">Total Items</p>
+                  <p className="text-3xl font-bold text-blue-900">{summary.totalItems}</p>
+                </div>
+              </div>
+
+              {/* Category Sales Chart */}
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold mb-4">Category-wise Sales Revenue</h3>
+                <Bar
+                  data={{
+                    labels: categories.map(c => c.category),
+                    datasets: [{
+                      label: 'Sales Revenue (₹)',
+                      data: categories.map(c => c.salesRevenue),
+                      backgroundColor: 'rgba(34, 197, 94, 0.7)'
+                    }]
+                  }}
+                  options={{ 
+                    responsive: true,
+                    plugins: { legend: { display: false } }
+                  }}
+                />
+              </div>
+
+              {/* Category Details Table */}
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                  <h3 className="font-semibold">Detailed Category Statistics</h3>
+                </div>
+                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Items</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Value</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Sold</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Revenue</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {categories.map((category, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{category.category}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{category.totalItems}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{category.totalStock}</td>
+                          <td className="px-6 py-4 text-sm text-indigo-600 font-semibold">₹{formatINR(category.stockValue)}</td>
+                          <td className="px-6 py-4 text-sm text-green-600 font-semibold">{category.itemsSold}</td>
+                          <td className="px-6 py-4 text-sm text-green-700 font-bold">₹{formatINR(category.salesRevenue)}</td>
+                          <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{category.itemsPurchased}</td>
+                          <td className="px-6 py-4 text-sm text-red-600 font-semibold">₹{formatINR(category.purchaseCost)}</td>
                         </tr>
                       ))}
                     </tbody>

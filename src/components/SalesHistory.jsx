@@ -31,7 +31,9 @@ const SalesHistory = () => {
     customer: '',
     item: '',
     salesman: '',
-    billNumber: ''
+    billNumber: '',
+    paymentStatus: '', // New filter
+    approvalStatus: '' // New filter
   });
   const [items, setItems] = useState([]);
   const [salesmen, setSalesmen] = useState([]);
@@ -165,9 +167,11 @@ const SalesHistory = () => {
       customer: '',
       item: '', 
       salesman: '',
-      billNumber: ''
+      billNumber: '',
+      paymentStatus: '',
+      approvalStatus: ''
     });
-    setCurrentPage(1); // Reset to first page
+    setCurrentPage(1);
     loadSalesHistory();
   };
 
@@ -498,8 +502,17 @@ const SalesHistory = () => {
       (sale.item_names && sale.item_names.toLowerCase().includes(filters.item.toLowerCase()));
     const matchSalesman = !filters.salesman || String(sale.salesman_id) === String(filters.salesman);
     const matchBill = !filters.billNumber || sale.bill_number.toLowerCase().includes(filters.billNumber.toLowerCase());
+    
+    // New filters
+    const matchPaymentStatus = !filters.paymentStatus || 
+      (filters.paymentStatus === 'paid' && sale.is_paid === 1) ||
+      (filters.paymentStatus === 'unpaid' && (sale.is_paid === 0 || !sale.is_paid));
+    
+    const matchApprovalStatus = !filters.approvalStatus || 
+      (filters.approvalStatus === 'approved' && sale.is_approved === 1) ||
+      (filters.approvalStatus === 'not_approved' && (sale.is_approved === 0 || !sale.is_approved));
 
-    return matchStartDate && matchEndDate && matchCustomer && matchItem && matchSalesman && matchBill;
+    return matchStartDate && matchEndDate && matchCustomer && matchItem && matchSalesman && matchBill && matchPaymentStatus && matchApprovalStatus;
   });
 
   // --- PAGINATION LOGIC ---
@@ -691,7 +704,7 @@ const SalesHistory = () => {
               onChange={e => setFilters({ ...filters, salesman: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="">Select Salesman</option>
+              <option value="">All Salesmen</option>
               {salesmen.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -707,6 +720,34 @@ const SalesHistory = () => {
               placeholder="Enter bill number"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* New Payment Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Status</label>
+            <select
+              value={filters.paymentStatus}
+              onChange={e => setFilters({ ...filters, paymentStatus: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All</option>
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </div>
+
+          {/* New Approval Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Approval Status</label>
+            <select
+              value={filters.approvalStatus}
+              onChange={e => setFilters({ ...filters, approvalStatus: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All</option>
+              <option value="approved">Approved</option>
+              <option value="not_approved">Not Approved</option>
+            </select>
           </div>
         </div>
         
@@ -754,14 +795,15 @@ const SalesHistory = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Total Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+               
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Paid
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Approve
+                </th>
+                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -792,6 +834,29 @@ const SalesHistory = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     ₹{sale.total_amount.toLocaleString()}
+                  </td>
+                  
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        checked={sale.is_paid === 1}
+                        onChange={(e) => handlePaidChange(sale.id, e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      {sale.is_paid === 1 && sale.payment_method && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          {sale.payment_method.toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <input 
+                      type='checkbox' 
+                      checked={sale.is_approved === 1}
+                      onChange={(e) => handleApproveChange(sale.id, e.target.checked)}
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
                     <button
@@ -825,28 +890,6 @@ const SalesHistory = () => {
                     >
                       <FileText className="w-4 h-4" />
                     </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <div className="flex items-center space-x-2">
-                      <input 
-                        type="checkbox" 
-                        checked={sale.is_paid === 1}
-                        onChange={(e) => handlePaidChange(sale.id, e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      {sale.is_paid === 1 && sale.payment_method && (
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                          {sale.payment_method.toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <input 
-                      type='checkbox' 
-                      checked={sale.is_approved === 1}
-                      onChange={(e) => handleApproveChange(sale.id, e.target.checked)}
-                    />
                   </td>
                 </tr>
               ))}
