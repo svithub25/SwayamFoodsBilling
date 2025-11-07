@@ -19,6 +19,7 @@ import Ledger from "./components/Ledger";
 import Export from "./components/Export"; 
 import Backup from "./components/Backup";
 import ComingSoon from "./components/ComingSoon";
+import Banking from "./components/Banking";
 import Analytics from "./components/Analytics"; 
 import Admin from "./components/Admin";
 import ItemDetails from "./components/ItemDetails";
@@ -107,7 +108,7 @@ const App = () => {
                 <Route path="/export" element={<Export />} />
                 <Route path="/backup" element={<Backup />} />  
                 <Route path="/analytics" element={<Analytics />} />  
-                 <Route path="/banking" element={<ComingSoon />} /> 
+                 <Route path="/banking" element={<Banking />} /> 
                 <Route path="/admin" element={<Admin />} /> 
                 <Route path="/item/:id" element={<ItemDetails />} />
                 <Route path="/purchase/:id" element={<PurchaseDetails />} />

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   IndianRupee
 } from 'lucide-react';
+import PinProtected from './reusables/PinProtected';
 
 const Ledger = () => {
   const [transactions, setTransactions] = useState([]);
@@ -131,6 +132,7 @@ const Ledger = () => {
   }
 
   return (
+     <PinProtected message="This module is protected and requires PIN verification to access." modulename='Ledger'> 
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -381,7 +383,7 @@ const Ledger = () => {
         )}
       </div>
     </div>
-  );
+ </PinProtected> );
 };
 
 export default Ledger;
