@@ -8,7 +8,8 @@ import {
   TrendingDown,
   DollarSign,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  IndianRupee
 } from 'lucide-react';
 
 const Ledger = () => {
@@ -27,12 +28,14 @@ const Ledger = () => {
 
   useEffect(() => {
     loadTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const loadTransactions = async () => {
     setLoading(true);
     try {
       const data = await window.electronAPI.getTransactions(filters);
+      console.log('Loaded transactions:', data);
       setTransactions(data);
       setCurrentPage(1); // Reset to first page on filter change
     } catch (error) {
@@ -45,7 +48,7 @@ const Ledger = () => {
   const getTotalSales = () => {
     return transactions
       .filter(t => t.type === 'sale')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.revenue || t.amount), 0);
   };
 
   const getTotalPurchases = () => {
@@ -55,7 +58,8 @@ const Ledger = () => {
   };
 
   const getProfit = () => {
-    return getTotalSales() - getTotalPurchases();
+    // Sum up gross profit from all transactions
+    return transactions.reduce((sum, t) => sum + (t.gross_profit || 0), 0);
   };
 
   // --- PAGINATION LOGIC ---
@@ -131,8 +135,8 @@ const Ledger = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Balance & Ledger</h1>
-          <p className="text-gray-600">Track all transactions and view profit/loss summary</p>
+          <h1 className="text-2xl font-bold text-gray-900">Ledger</h1>
+          <p className="text-gray-600">Track all transactions and view profit summary</p>
         </div>
       </div>
 
@@ -165,10 +169,10 @@ const Ledger = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className={`p-3 rounded-lg ${getProfit() >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
-              <DollarSign className={`w-6 h-6 ${getProfit() >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
+              <IndianRupee className={`w-6 h-6 ${getProfit() >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Net Profit/Loss</p>
+              <p className="text-sm font-medium text-gray-600">Gross Profit</p>
               <p className={`text-2xl font-bold ${getProfit() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ₹{getProfit().toLocaleString()}
               </p>
@@ -255,7 +259,7 @@ const Ledger = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {currentTransactions.map((transaction, index) => (
-                <tr key={index}>
+                <tr key={index} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(transaction.date).toLocaleDateString()}
                   </td>
@@ -275,9 +279,16 @@ const Ledger = () => {
                     {transaction.description}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <span className={transaction.type === 'sale' ? 'text-green-600' : 'text-red-600'}>
-                      {transaction.type === 'sale' ? '+' : '-'}₹{transaction.amount.toLocaleString()}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className={transaction.type === 'sale' ? 'text-green-600' : 'text-red-600'}>
+                        {transaction.type === 'sale' ? '+' : '-'}₹{transaction.amount.toLocaleString()}
+                      </span>
+                      {transaction.type === 'sale' && (
+                        <span className="text-xs text-gray-500">
+                          Profit: ₹{transaction.gross_profit?.toLocaleString() || '0'}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -689,11 +689,11 @@ ipcMain.handle('save-purchase', async (event, { supplier_id, invoice_number, pur
   const purchaseId = purchaseResult.lastInsertRowid;
 
   const purchaseItemStmt = db.prepare('INSERT INTO purchase_items (purchase_id, item_id, quantity, unit_price, gst_percentage, cgst_amount, sgst_amount, total_price, discount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  const updateItemStmt = db.prepare('UPDATE items SET current_stock = current_stock + ?, purchase_rate = ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?');
+  const updateItemStmt = db.prepare('UPDATE items SET current_stock = current_stock + ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?');
 
   items.forEach(item => {
     purchaseItemStmt.run(purchaseId, item.id, item.quantity, item.unit_price, item.gst_percentage, item.cgst_amount, item.sgst_amount, item.total_price, item.discount || 0);
-    updateItemStmt.run(item.quantity, item.unit_price, supplier_id, purchase_date, item.id);
+    updateItemStmt.run(item.quantity, supplier_id, purchase_date, item.id);
   });
 
   return { success: true, purchaseId };
@@ -959,40 +959,134 @@ ipcMain.handle('generate-purchase-order-pdf', async (event, orderData) => {
   return { success: true, orderData };
 });
 
+
 ipcMain.handle('get-transactions', async (event, { startDate, endDate, type }) => {
-  let query = '';
-  let params = [];
+  let transactions = [];
 
   if (type === 'all' || type === 'sales') {
-    const salesQuery = `
-      SELECT 'sale' as type, s.bill_number as ref_number, s.sale_date as date, 
-             s.total_amount as amount, 'Sale' as description
+    // Get all sales with detailed item information
+    const sales = db.prepare(`
+      SELECT 
+        s.id,
+        s.bill_number,
+        s.sale_date,
+        s.total_amount,
+        s.customer_name
       FROM sales s
       WHERE s.sale_date BETWEEN ? AND ?
-    `;
-    params.push(startDate, endDate);
-    query += salesQuery;
-  }
+      AND (s.status_code = 0 OR s.status_code IS NULL)
+      ORDER BY s.sale_date ASC
+    `).all(startDate, endDate);
 
-  if (type === 'all') {
-    query += ' UNION ALL ';
+    for (const sale of sales) {
+      // Get sale items with their quantities and prices
+      const saleItems = db.prepare(`
+        SELECT 
+          si.item_id,
+          si.quantity as sold_quantity,
+          si.unit_price as sale_price,
+          si.total_price as sale_total
+        FROM sale_items si
+        WHERE si.sale_id = ?
+        AND (si.status_code = 0 OR si.status_code IS NULL)
+      `).all(sale.id);
+
+      // Calculate cost of goods sold (COGS) using FIFO method
+      let totalCost = 0;
+      let totalRevenue = 0;
+
+      for (const saleItem of saleItems) {
+        totalRevenue += saleItem.sale_total || 0;
+        let remainingQty = saleItem.sold_quantity;
+
+        // Get all purchases for this item before or on the sale date, ordered by date (FIFO)
+        const purchases = db.prepare(`
+          SELECT 
+            pi.quantity as purchase_qty,
+            pi.unit_price as purchase_rate,
+            p.purchase_date
+          FROM purchase_items pi
+          JOIN purchases p ON pi.purchase_id = p.id
+          WHERE pi.item_id = ?
+          AND p.purchase_date <= ?
+          AND (pi.status_code = 0 OR pi.status_code IS NULL)
+          AND (p.status_code = 0 OR p.status_code IS NULL)
+          ORDER BY p.purchase_date ASC, p.id ASC
+        `).all(saleItem.item_id, sale.sale_date);
+
+        // Apply FIFO costing
+        for (const purchase of purchases) {
+          if (remainingQty <= 0) break;
+
+          const qtyToUse = Math.min(remainingQty, purchase.purchase_qty);
+          const costForThisBatch = qtyToUse * purchase.purchase_rate;
+          
+          totalCost += costForThisBatch;
+          remainingQty -= qtyToUse;
+        }
+
+        // If still remaining quantity (no purchase found), use current item purchase rate
+        if (remainingQty > 0) {
+          const currentRate = db.prepare(`
+            SELECT purchase_rate FROM items WHERE id = ?
+          `).get(saleItem.item_id);
+          
+          if (currentRate) {
+            totalCost += remainingQty * currentRate.purchase_rate;
+          }
+        }
+      }
+
+      const grossProfit = totalRevenue - totalCost;
+
+      transactions.push({
+        type: 'sale',
+        ref_number: sale.bill_number,
+        date: sale.sale_date,
+        amount: sale.total_amount,
+        cost: totalCost,
+        revenue: totalRevenue,
+        gross_profit: grossProfit,
+        description: `Sale - ${sale.customer_name || 'Walk-in Customer'}`
+      });
+    }
   }
 
   if (type === 'all' || type === 'purchases') {
-    const purchaseQuery = `
-      SELECT 'purchase' as type, p.invoice_number as ref_number, p.purchase_date as date,
-             p.total_amount as amount, 'Purchase' as description
+    const purchases = db.prepare(`
+      SELECT 
+        p.id,
+        p.invoice_number,
+        p.purchase_date,
+        p.total_amount,
+        s.name as supplier_name
       FROM purchases p
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE p.purchase_date BETWEEN ? AND ?
-    `;
-    params.push(startDate, endDate);
-    query += purchaseQuery;
+      AND (p.status_code = 0 OR p.status_code IS NULL)
+    `).all(startDate, endDate);
+
+    purchases.forEach(purchase => {
+      transactions.push({
+        type: 'purchase',
+        ref_number: purchase.invoice_number,
+        date: purchase.purchase_date,
+        amount: purchase.total_amount,
+        cost: purchase.total_amount,
+        revenue: 0,
+        gross_profit: 0, // Purchases don't have profit, only cost
+        description: `Purchase - ${purchase.supplier_name || 'Unknown Supplier'}`
+      });
+    });
   }
 
-  query += ' ORDER BY date DESC';
+  // Sort by date descending
+  transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  return db.prepare(query).all(...params);
+  return transactions;
 });
+
+
 
 ipcMain.handle('backup-database', async () => {
   try {

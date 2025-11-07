@@ -31,19 +31,63 @@ const Export = () => {
     if (filters.reportType === 'inventory') {
       worksheet.columns = [
         { header: 'Item Name', key: 'name', width: 25 },
-        { header: 'Category', key: 'category_name', width: 15 },
         { header: 'Current Stock', key: 'current_stock', width: 15 },
-        { header: 'Minimum Stock', key: 'minimum_stock', width: 15 },
-        { header: 'Unit Price', key: 'unit_price', width: 12 },
-        { header: 'Total Value', key: 'total_value', width: 12 },
-        { header: 'Last Supplier', key: 'supplier_name', width: 20 }
+        { header: 'Purchase Rate', key: 'purchase_rate', width: 15 },
+        { header: 'Customer Rate', key: 'customer_rate', width: 15 },
+        { header: 'Salesman Rate', key: 'salesman_rate', width: 15 },
+        { header: 'Total Value (Purchase)', key: 'total_value_purchase', width: 20 },
+        { header: 'Total Value (Customer)', key: 'total_value_customer', width: 20 },
       ];
+      
+      // Initialize grand totals
+      let grandTotalStock = 0;
+      let grandTotalPurchaseRate = 0;
+      let grandTotalCustomerRate = 0;
+      let grandTotalSalesmanRate = 0;
+      let grandTotalValuePurchase = 0;
+      let grandTotalValueCustomer = 0;
+      
       data.forEach(item => {
+        const totalValuePurchase = item.current_stock * item.purchase_rate;
+        const totalValueCustomer = item.current_stock * item.customer_rate;
+        
         worksheet.addRow({
           ...item,
-          total_value: item.current_stock * item.unit_price
+          total_value_purchase: totalValuePurchase,
+          total_value_customer: totalValueCustomer
         });
+        
+        // Accumulate totals
+        grandTotalStock += item.current_stock;
+        grandTotalPurchaseRate += item.purchase_rate;
+        grandTotalCustomerRate += item.customer_rate;
+        grandTotalSalesmanRate += item.salesman_rate;
+        grandTotalValuePurchase += totalValuePurchase;
+        grandTotalValueCustomer += totalValueCustomer;
       });
+      
+      // Add empty row for spacing
+      worksheet.addRow({});
+      
+      // Add Grand Total row
+      const grandTotalRow = worksheet.addRow({
+        name: 'GRAND TOTAL',
+        current_stock: grandTotalStock,
+        purchase_rate: grandTotalPurchaseRate,
+        customer_rate: grandTotalCustomerRate,
+        salesman_rate: grandTotalSalesmanRate,
+        total_value_purchase: grandTotalValuePurchase,
+        total_value_customer: grandTotalValueCustomer
+      });
+      
+      // Style the grand total row
+      grandTotalRow.font = { bold: true };
+      grandTotalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFD700' } // Gold color
+      };
+      
     } else if (filters.reportType === 'sales' || filters.reportType === 'purchases') {
       worksheet.columns = [
         { header: 'Sr. No.', key: 'sr_no', width: 8 },
@@ -53,20 +97,20 @@ const Export = () => {
         { header: 'address', key: 'address', width: 20 },
         { header: 'GSTIN', key: 'gstin', width: 18 },
         { header: 'Net Amount', key: 'net_amount', width: 12 },
-        { header: 'HSN Code wise', key: 'hsn_code', width: 15 },
-        { header: '0%', key: 'tax_0', width: 8 },
-        { header: '5%', key: 'tax_5', width: 8 },
-        { header: 'SGST2.5%', key: 'sgst_2_5', width: 10 },
-        { header: 'CGST2.5%', key: 'cgst_2_5', width: 10 },
-        { header: 'IGST 5%', key: 'igst_5', width: 10 },
-        { header: '12%', key: 'tax_12', width: 8 },
-        { header: 'SGST6%', key: 'sgst_6', width: 10 },
-        { header: 'CGST6%', key: 'cgst_6', width: 10 },
-        { header: 'IGST 12%', key: 'igst_12', width: 10 },
-        { header: '18%', key: 'tax_18', width: 8 },
-        { header: 'SGST9%', key: 'sgst_9', width: 10 },
-        { header: 'CGST9%', key: 'cgst_9', width: 10 },
-        { header: 'IGST 18%', key: 'igst_18', width: 10 }
+        // { header: 'HSN Code wise', key: 'hsn_code', width: 15 },
+        // { header: '0%', key: 'tax_0', width: 8 },
+        // { header: '5%', key: 'tax_5', width: 8 },
+        // { header: 'SGST2.5%', key: 'sgst_2_5', width: 10 },
+        // { header: 'CGST2.5%', key: 'cgst_2_5', width: 10 },
+        // { header: 'IGST 5%', key: 'igst_5', width: 10 },
+        // { header: '12%', key: 'tax_12', width: 8 },
+        // { header: 'SGST6%', key: 'sgst_6', width: 10 },
+        // { header: 'CGST6%', key: 'cgst_6', width: 10 },
+        // { header: 'IGST 12%', key: 'igst_12', width: 10 },
+        // { header: '18%', key: 'tax_18', width: 8 },
+        // { header: 'SGST9%', key: 'sgst_9', width: 10 },
+        // { header: 'CGST9%', key: 'cgst_9', width: 10 },
+        // { header: 'IGST 18%', key: 'igst_18', width: 10 }
       ];
       data.forEach((row, idx) => {
         worksheet.addRow({
@@ -77,20 +121,20 @@ const Export = () => {
           address: row.address || row.customer_address || '',
           gstin: row.gstin || row.customer_gstin || '',
           net_amount: row.total_amount || '',
-          hsn_code: row.hsn_code || '',
-          tax_0: row.tax_0 || '',
-          tax_5: row.tax_5 || '',
-          sgst_2_5: row.sgst_2_5 || '',
-          cgst_2_5: row.cgst_2_5 || '',
-          igst_5: row.igst_5 || '',
-          tax_12: row.tax_12 || '',
-          sgst_6: row.sgst_6 || '',
-          cgst_6: row.cgst_6 || '',
-          igst_12: row.igst_12 || '',
-          tax_18: row.tax_18 || '',
-          sgst_9: row.sgst_9 || '',
-          cgst_9: row.cgst_9 || '',
-          igst_18: row.igst_18 || ''
+          // hsn_code: row.hsn_code || '',
+          // tax_0: row.tax_0 || '',
+          // tax_5: row.tax_5 || '',
+          // sgst_2_5: row.sgst_2_5 || '',
+          // cgst_2_5: row.cgst_2_5 || '',
+          // igst_5: row.igst_5 || '',
+          // tax_12: row.tax_12 || '',
+          // sgst_6: row.sgst_6 || '',
+          // cgst_6: row.cgst_6 || '',
+          // igst_12: row.igst_12 || '',
+          // tax_18: row.tax_18 || '',
+          // sgst_9: row.sgst_9 || '',
+          // cgst_9: row.cgst_9 || '',
+          // igst_18: row.igst_18 || ''
         });
       });
     }
@@ -114,40 +158,89 @@ const Export = () => {
   };
 
   const exportToPDF = (data, filename, title) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('landscape');
     
     // Title
     doc.setFontSize(16);
-    doc.text(title, 105, 20, { align: 'center' });
+    doc.text(title, 148, 20, { align: 'center' });
     
     // Date range
     doc.setFontSize(10);
-    doc.text(`Period: ${filters.startDate} to ${filters.endDate}`, 105, 30, { align: 'center' });
+    doc.text(`Period: ${filters.startDate} to ${filters.endDate}`, 148, 30, { align: 'center' });
     
     let yPosition = 50;
     
     if (filters.reportType === 'inventory') {
-      // Headers
-      doc.text('Item Name', 20, yPosition);
-      doc.text('Stock', 100, yPosition);
-      doc.text('Price', 130, yPosition);
-      doc.text('Value', 160, yPosition);
+      // Headers - adjusted for landscape
+      doc.setFontSize(8);
+      doc.text('Item Name', 10, yPosition);
+      doc.text('Stock', 80, yPosition);
+      doc.text('P.Rate', 110, yPosition);
+      doc.text('C.Rate', 135, yPosition);
+      doc.text('S.Rate', 160, yPosition);
+      doc.text('Val(P)', 185, yPosition);
+      doc.text('Val(C)', 220, yPosition);
       
       yPosition += 10;
-      doc.line(20, yPosition, 190, yPosition);
+      doc.line(10, yPosition, 280, yPosition);
+      
+      // Initialize grand totals
+      let grandTotalStock = 0;
+      let grandTotalPurchaseRate = 0;
+      let grandTotalCustomerRate = 0;
+      let grandTotalSalesmanRate = 0;
+      let grandTotalValuePurchase = 0;
+      let grandTotalValueCustomer = 0;
       
       data.forEach((item) => {
         yPosition += 8;
-        if (yPosition > 280) {
+        if (yPosition > 180) {
           doc.addPage();
           yPosition = 20;
         }
         
-        doc.text(item.name, 20, yPosition);
-        doc.text(item.current_stock.toString(), 100, yPosition);
-        doc.text(`₹${item.unit_price}`, 130, yPosition);
-        doc.text(`₹${(item.current_stock * item.unit_price).toFixed(2)}`, 160, yPosition);
+        const totalValuePurchase = item.current_stock * item.purchase_rate;
+        const totalValueCustomer = item.current_stock * item.customer_rate;
+        
+        doc.text(item.name.substring(0, 30), 10, yPosition);
+        doc.text(item.current_stock.toString(), 80, yPosition);
+        doc.text(`₹${item.purchase_rate.toFixed(2)}`, 110, yPosition);
+        doc.text(`₹${item.customer_rate.toFixed(2)}`, 135, yPosition);
+        doc.text(`₹${item.salesman_rate.toFixed(2)}`, 160, yPosition);
+        doc.text(`₹${totalValuePurchase.toFixed(2)}`, 185, yPosition);
+        doc.text(`₹${totalValueCustomer.toFixed(2)}`, 220, yPosition);
+        
+        // Accumulate totals
+        grandTotalStock += item.current_stock;
+        grandTotalPurchaseRate += item.purchase_rate;
+        grandTotalCustomerRate += item.customer_rate;
+        grandTotalSalesmanRate += item.salesman_rate;
+        grandTotalValuePurchase += totalValuePurchase;
+        grandTotalValueCustomer += totalValueCustomer;
       });
+      
+      // Add Grand Total row
+      yPosition += 15;
+      if (yPosition > 180) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      // Draw separator line
+      doc.line(10, yPosition - 5, 280, yPosition - 5);
+      
+      // Grand Total text
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.text('GRAND TOTAL', 10, yPosition);
+      doc.text(grandTotalStock.toString(), 80, yPosition);
+      doc.text(`₹${grandTotalPurchaseRate.toFixed(2)}`, 110, yPosition);
+      doc.text(`₹${grandTotalCustomerRate.toFixed(2)}`, 135, yPosition);
+      doc.text(`₹${grandTotalSalesmanRate.toFixed(2)}`, 160, yPosition);
+      doc.text(`₹${grandTotalValuePurchase.toFixed(2)}`, 185, yPosition);
+      doc.text(`₹${grandTotalValueCustomer.toFixed(2)}`, 220, yPosition);
+      doc.setFont(undefined, 'normal');
+      
     } else if (filters.reportType === 'sales') {
       // Headers
       doc.text('Bill No', 20, yPosition);
@@ -159,7 +252,7 @@ const Export = () => {
       
       data.forEach((sale) => {
         yPosition += 8;
-        if (yPosition > 280) {
+        if (yPosition > 180) {
           doc.addPage();
           yPosition = 20;
         }
@@ -216,7 +309,7 @@ const Export = () => {
   };
 
 
-  // PIN protection wrapper
+  // PIN protection wrapper 
   return (
     <PinProtected message="This module is protected and requires PIN verification to access." modulename="Export">
     

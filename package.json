@@ -1,8 +1,8 @@
 {
   "name": "billing-software",
-  "private": true, 
+  "private": true,
   "version": "1.1.0",
-  "type": "module", 
+  "type": "module",
   "main": "electron/main.js",
   "homepage": "./",
   "description": "Modern billing and commission management software with reporting, charts, and Excel/PDF export.",
@@ -15,14 +15,11 @@
     "type": "git",
     "url": "https://github.com/InfernoTJ/BillingSoftware"
   },
- 
   "support": {
     "email": "support@mybillingapp.com",
     "phone": "+91-9876543210"
   },
   "releaseDate": "2025-09-26",
- 
- 
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "dev:vite": "vite",
@@ -44,6 +41,7 @@
     "node-machine-id": "^1.1.12",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.0",
+    "react-datepicker": "^8.8.0",
     "react-dom": "^18.3.1",
     "react-hotkeys-hook": "^5.1.0",
     "react-router-dom": "^7.7.0",
@@ -79,23 +77,26 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*", 
+      "electron/**/*",
       "database.db",
       "package.json"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "electron/favicon.ico",
       "publisherName": "Tanmay Joshi"
     },
     "nsis": {
       "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true,
-    "createStartMenuShortcut": true,
-    "shortcutName": "Billing Software",
-    "uninstallDisplayName": "Billing Software",
-    "license": "electron/License"
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Billing Software",
+      "uninstallDisplayName": "Billing Software",
+      "license": "electron/License"
     },
     "extraResources": [
       {
