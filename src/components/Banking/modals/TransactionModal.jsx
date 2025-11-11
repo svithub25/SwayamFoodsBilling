@@ -22,18 +22,28 @@ function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
     to_account_id: ''
   });
 
+  const [isEditMode, setIsEditMode] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       loadInitialData();
+      setIsEditMode(!!editData);
     }
-  }, [isOpen]);
+  }, [isOpen, editData]);
 
   useEffect(() => {
     if (editData) {
       setTransactionForm({
-        ...editData,
+        voucher_type: editData.voucher_type || 'Payment',
         transaction_date: editData.transaction_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+        bank_account_id: editData.bank_account_id || '',
+        party_name: editData.party_name || '',
+        amount: editData.amount || '',
+        cheque_number: editData.cheque_number || '',
         cheque_date: editData.cheque_date?.split('T')[0] || '',
+        narration: editData.narration || '',
+        is_pdc: editData.is_pdc || false,
+        to_account_id: editData.to_account_id || ''
       });
     }
   }, [editData]);
@@ -95,23 +105,43 @@ function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
 
     setSaving(true);
     try {
-      const voucherNumber = await window.electronAPI.generateVoucherNumber(transactionForm.voucher_type);
-      
-      const result = await window.electronAPI.saveBankTransaction({
-        ...transactionForm,
-        amount: parseFloat(transactionForm.amount),
-        voucher_number: voucherNumber,
-        created_by: 'admin'
-      });
-      
-      if (result.success) {
-        const transactionTypeText = 
-          transactionForm.voucher_type === 'Payment' ? 'Payment' :
-          transactionForm.voucher_type === 'Receipt' ? 'Receipt' :
-          'Bank Transfer';
-        toast.success(`${transactionTypeText} saved successfully!`);
-        onSuccess();
-        handleClose();
+      if (isEditMode && editData) {
+        // UPDATE existing transaction
+        const result = await window.electronAPI.updateBankTransaction(editData.id, {
+          ...transactionForm,
+          amount: parseFloat(transactionForm.amount),
+          created_by: 'admin'
+        });
+        
+        if (result.success) {
+          const transactionTypeText = 
+            transactionForm.voucher_type === 'Payment' ? 'Payment' :
+            transactionForm.voucher_type === 'Receipt' ? 'Receipt' :
+            'Bank Transfer';
+          toast.success(`${transactionTypeText} updated successfully!`);
+          onSuccess();
+          handleClose();
+        }
+      } else {
+        // CREATE new transaction
+        const voucherNumber = await window.electronAPI.generateVoucherNumber(transactionForm.voucher_type);
+        
+        const result = await window.electronAPI.saveBankTransaction({
+          ...transactionForm,
+          amount: parseFloat(transactionForm.amount),
+          voucher_number: voucherNumber,
+          created_by: 'admin'
+        });
+        
+        if (result.success) {
+          const transactionTypeText = 
+            transactionForm.voucher_type === 'Payment' ? 'Payment' :
+            transactionForm.voucher_type === 'Receipt' ? 'Receipt' :
+            'Bank Transfer';
+          toast.success(`${transactionTypeText} saved successfully!`);
+          onSuccess();
+          handleClose();
+        }
       }
     } catch (error) {
       console.error('Error saving transaction:', error);
@@ -135,6 +165,7 @@ function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
       to_account_id: ''
     });
     setErrors({});
+    setIsEditMode(false);
     onClose();
   };
 
@@ -156,7 +187,7 @@ function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h3 className="text-xl font-semibold text-gray-900">
-            {editData ? 'Edit Transaction' : 'New Banking Entry'}
+            {isEditMode ? 'Edit Transaction' : 'New Banking Entry'}
           </h3>
           <button
             onClick={handleClose}
@@ -350,7 +381,7 @@ function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300" 
                 disabled={saving}
               >
-                {saving ? 'Saving...' : 'Save Transaction'}
+                {saving ? 'Saving...' : isEditMode ? 'Update Transaction' : 'Save Transaction'}
               </button>
             </div>
           </form>

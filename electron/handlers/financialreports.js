@@ -128,8 +128,8 @@ export function registerFinancialReportsHandlers({ ipcMain, getDb }) {
       const openingStockValue = db.prepare(`
         SELECT COALESCE(SUM(opening_amount), 0) as total
         FROM opening_stock
-        WHERE opening_date < ?
-      `).get(startDate);
+        WHERE opening_date > ?
+      `).get(startDate); 
 
       // 4. PURCHASES during period
       const purchasesValue = db.prepare(`

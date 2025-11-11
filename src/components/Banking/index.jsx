@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import PinProtected from '../reusables/PinProtected';
-import { Banknote, FileText, CheckCircle, Calendar, TrendingUp } from 'lucide-react';
+import { Banknote, FileText, CheckCircle, Calendar, TrendingUp, Settings } from 'lucide-react';
 
 // Import tab components
 import BankingDashboard from './BankingDashboard';
 import BankingTransactions from './BankingTransactions';
-// import BankingReconciliation from './BankingReconciliation';
-// import BankingPDC from './BankingPDC';
 import BankingReports from './BankingReports';
+import BankSettings from './BankSettings';
 import { toast } from 'react-toastify';
 
 function Banking() {
@@ -44,17 +43,21 @@ function Banking() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  // NEW: Handler for transaction changes
+  const handleTransactionChange = () => {
+    handleRefresh();
+  };
+
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: Banknote },
     { id: 'transactions', name: 'Transactions', icon: FileText },
-    // { id: 'reconciliation', name: 'Reconciliation', icon: CheckCircle },
-    // { id: 'pdc', name: 'PDC Management', icon: Calendar },
-    { id: 'reports', name: 'Reports', icon: TrendingUp }
+    { id: 'reports', name: 'Reports', icon: TrendingUp },
+    { id: 'bank_settings', name: 'Settings', icon: Settings }
   ];
 
   return (
     <>
-    {/* <PinProtected message="This module is protected and requires PIN verification to access." modulename='Banking'> */}
+    <PinProtected message="This module is protected and requires PIN verification to access." modulename="Banking">
       <div className="p-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="mb-6">
@@ -102,30 +105,23 @@ function Banking() {
             bankAccounts={bankAccounts}
             categories={categories}
             onRefresh={handleRefresh}
+            onTransactionChange={handleTransactionChange}
           />
         )}
-        
-        {/* {activeTab === 'reconciliation' && (
-          <BankingReconciliation 
-            bankAccounts={bankAccounts}
-            onRefresh={handleRefresh}
-          />
-        )} */}
-        
-        {/* {activeTab === 'pdc' && (
-          <BankingPDC 
-            bankAccounts={bankAccounts}
-            onRefresh={handleRefresh}
-          />
-        )} */}
         
         {activeTab === 'reports' && (
           <BankingReports 
             bankAccounts={bankAccounts}
           />
         )}
+        
+        {activeTab === 'bank_settings' && (
+          <BankSettings 
+            onRefresh={handleRefresh}
+          />
+        )}
       </div>
-    {/* </PinProtected> */}
+      </PinProtected>
     </>
   );
 }

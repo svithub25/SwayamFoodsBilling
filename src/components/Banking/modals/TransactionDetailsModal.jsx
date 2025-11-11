@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, FileText, Calendar, CreditCard, Building2 } from 'lucide-react';
+import { X, FileText, Calendar, CreditCard, Building2, TrendingDown, TrendingUp } from 'lucide-react';
 
 function TransactionDetailsModal({ isOpen, onClose, transaction }) {
   if (!isOpen || !transaction) return null;
@@ -46,10 +46,22 @@ function TransactionDetailsModal({ isOpen, onClose, transaction }) {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Amount</p>
-                <p className={`text-2xl font-bold ${transaction.transaction_type === 'Debit' ? 'text-green-600' : 'text-red-600'}`}>
-                  ₹{transaction.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}
-                </p>
+                <p className="text-sm text-gray-600 mb-1">Amount</p>
+                <div className="flex items-center">
+                  {transaction.transaction_type === 'Debit' ? (
+                    <TrendingDown className="w-5 h-5 text-red-600 mr-2" />
+                  ) : (
+                    <TrendingUp className="w-5 h-5 text-green-600 mr-2" />
+                  )}
+                  <div>
+                    <p className={`text-2xl font-bold ${transaction.transaction_type === 'Debit' ? 'text-red-600' : 'text-green-600'}`}>
+                      ₹{transaction.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {transaction.transaction_type === 'Debit' ? 'Money OUT (Debit)' : 'Money IN (Credit)'}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -151,27 +163,48 @@ function TransactionDetailsModal({ isOpen, onClose, transaction }) {
           )}
 
           {/* Ledger Entries */}
-          {transaction.ledgerEntries && transaction.ledgerEntries.length > 0 && (
+          {/* {transaction.ledgerEntries && transaction.ledgerEntries.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 mb-3">Ledger Entries (Double Entry)</h4>
+              <h4 className="font-semibold text-gray-900 mb-3">Ledger Entries (Double Entry Bookkeeping)</h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ledger</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                        Debit
+                        <div className="text-xs text-gray-400 font-normal normal-case">(Asset/Expense ↑)</div>
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                        Credit
+                        <div className="text-xs text-gray-400 font-normal normal-case">(Liability/Income ↑)</div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {transaction.ledgerEntries.map((entry, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2 text-sm text-gray-900">{entry.ledger_name || 'N/A'}</td>
-                        <td className="px-4 py-2 text-sm text-right text-green-600">
-                          {entry.debit_amount > 0 ? `₹${entry.debit_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900">
+                          <div className="font-medium">{entry.ledger_name || 'N/A'}</div>
+                          <div className="text-xs text-gray-500">{entry.ledger_type}</div>
                         </td>
-                        <td className="px-4 py-2 text-sm text-right text-red-600">
-                          {entry.credit_amount > 0 ? `₹${entry.credit_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
+                        <td className="px-4 py-2 text-sm text-right font-semibold text-gray-900">
+                          {entry.debit_amount > 0 ? (
+                            <span className="text-gray-900">
+                              ₹{entry.debit_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right font-semibold text-gray-900">
+                          {entry.credit_amount > 0 ? (
+                            <span className="text-gray-900">
+                              ₹{entry.credit_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -179,18 +212,24 @@ function TransactionDetailsModal({ isOpen, onClose, transaction }) {
                   <tfoot className="bg-gray-50">
                     <tr>
                       <td className="px-4 py-2 text-sm font-semibold text-gray-900">Total</td>
-                      <td className="px-4 py-2 text-sm font-semibold text-right text-green-600">
+                      <td className="px-4 py-2 text-sm font-semibold text-right text-gray-900">
                         ₹{transaction.ledgerEntries.reduce((sum, e) => sum + (e.debit_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-                      <td className="px-4 py-2 text-sm font-semibold text-right text-red-600">
+                      <td className="px-4 py-2 text-sm font-semibold text-right text-gray-900">
                         ₹{transaction.ledgerEntries.reduce((sum, e) => sum + (e.credit_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> In double-entry bookkeeping, every transaction affects at least two accounts. 
+                  The total debits must always equal the total credits.
+                </p>
+              </div>
             </div>
-          )}
+          )} */}
 
           {/* PDC Info */}
           {transaction.pdcInfo && (
@@ -222,8 +261,30 @@ function TransactionDetailsModal({ isOpen, onClose, transaction }) {
             </div>
           )}
 
+          {/* Contra Transfer Info */}
+          {transaction?.voucher_type === 'Contra' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-3 flex items-center">
+                <TrendingDown className="w-5 h-5 mr-2" />
+                Bank Transfer Details
+              </h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-white p-3 rounded border border-blue-200">
+                  <p className="text-gray-600 text-xs mb-1">From Account (Money OUT)</p>
+                  <p className="font-medium text-red-700">{transaction.account_name}</p>
+                  <p className="text-gray-500 text-xs">{transaction.bank_name}</p>
+                </div>
+                <div className="bg-white p-3 rounded border border-blue-200">
+                  <p className="text-gray-600 text-xs mb-1">To Account (Money IN)</p>
+                  <p className="font-medium text-green-700">{transaction.party_name?.replace('Transfer to ', '')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Metadata */}
           <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-3">Transaction Information</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
               {transaction.created_by && (
                 <div>
@@ -257,24 +318,6 @@ function TransactionDetailsModal({ isOpen, onClose, transaction }) {
               )}
             </div>
           </div>
-
-          {/* Contra Transfer Info - New Section */}
-          {transaction?.voucher_type === 'Contra' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">Bank Transfer Details</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">From Account:</p>
-                  <p className="font-medium">{transaction.account_name}</p>
-                  <p className="text-gray-500 text-xs">{transaction.bank_name}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">To Account:</p>
-                  <p className="font-medium">{transaction.party_name?.replace('Transfer to ', '')}</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
         
         <div className="p-6 border-t border-gray-200 flex justify-end">

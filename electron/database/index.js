@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { runMigrations } from './migrations.js';
 
 export function initDatabase(dbPath) {
   const db = new Database(dbPath);
@@ -365,9 +366,10 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
   -- Expense/Income Categories
   CREATE TABLE IF NOT EXISTS transaction_categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    category_name TEXT NOT NULL ,
+    category_name TEXT NOT NULL UNIQUE,
     category_type TEXT CHECK(category_type IN ('Expense', 'Income')) NOT NULL,
     description TEXT,
+    is_default INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -390,6 +392,12 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
     FOREIGN KEY (transaction_id) REFERENCES bank_transactions (id)
   );
 
+   CREATE TABLE IF NOT EXISTS schema_migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      migration_name TEXT NOT NULL UNIQUE,
+      executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
   -- Create indexes for better performance
   CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(transaction_date);
   CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(bank_account_id);
@@ -399,21 +407,47 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
 `);
 
 // Insert default categories
+// Insert default categories
 db.exec(`
-  INSERT OR IGNORE INTO transaction_categories (category_name, category_type, description) VALUES
-  ('Salary', 'Expense', 'Employee salaries and wages'),
-  ('Rent', 'Expense', 'Office/Shop rent'),
-  ('Utilities', 'Expense', 'Electricity, Water, Internet'),
-  ('Office Supplies', 'Expense', 'Stationery and supplies'),
-  ('Transport', 'Expense', 'Vehicle and fuel expenses'),
-  ('Professional Fees', 'Expense', 'CA, Legal, Consulting fees'),
-  ('Bank Charges', 'Expense', 'Bank fees and charges'),
-  ('Interest Paid', 'Expense', 'Loan interest payments'),
-  ('Taxes', 'Expense', 'GST, Income Tax payments'),
-  ('Miscellaneous', 'Expense', 'Other expenses'),
-  ('Sales Revenue', 'Income', 'Revenue from sales'),
-  ('Interest Received', 'Income', 'Interest from deposits'),
-  ('Other Income', 'Income', 'Miscellaneous income');
+  INSERT OR IGNORE INTO transaction_categories (category_name, category_type, description, is_default) VALUES
+  -- EXPENSE CATEGORIES
+  ('Purchase of Goods', 'Expense', 'Purchase of trading/raw material goods', 1),
+  ('Salary & Wages', 'Expense', 'Employee salaries and daily wages', 1),
+  ('Rent', 'Expense', 'Office/Shop/Warehouse rent', 1),
+  ('Electricity', 'Expense', 'Power and electricity bills', 1),
+  ('Telephone & Internet', 'Expense', 'Communication expenses', 1),
+  ('Transportation & Freight', 'Expense', 'Vehicle, fuel, and freight charges', 1),
+  ('Packaging Material', 'Expense', 'Boxes, bags, and packaging supplies', 1),
+  ('Loading & Unloading', 'Expense', 'Labour charges for loading/unloading', 1),
+  ('Stationery & Printing', 'Expense', 'Office supplies and printing', 1),
+  ('Bank Charges', 'Expense', 'Bank fees, charges, and commission', 1),
+  ('Interest on Loan', 'Expense', 'Interest paid on business loans', 1),
+  ('GST Payment', 'Expense', 'GST paid to government', 1),
+  ('TDS Payment', 'Expense', 'TDS deducted and paid', 1),
+  ('Professional Fees', 'Expense', 'CA, Legal, Consultant fees', 1),
+  ('Repairs & Maintenance', 'Expense', 'Equipment and building maintenance', 1),
+  ('Vehicle Maintenance', 'Expense', 'Vehicle servicing and repairs', 1),
+  ('Insurance Premium', 'Expense', 'Business and vehicle insurance', 1),
+  ('License & Registration', 'Expense', 'FSSAI, Trade License, GST registration', 1),
+  ('Marketing & Advertising', 'Expense', 'Promotion and advertising costs', 1),
+  ('Travelling & Conveyance', 'Expense', 'Business travel expenses', 1),
+  ('Office Expenses', 'Expense', 'General office running expenses', 1),
+  ('Security Charges', 'Expense', 'Watchman and security services', 1),
+  ('Water Charges', 'Expense', 'Water supply bills', 1),
+  ('Charitable Donations', 'Expense', 'Donations and CSR activities', 1),
+  ('Miscellaneous Expenses', 'Expense', 'Other small expenses', 1),
+  
+  -- INCOME CATEGORIES
+  ('Sales Revenue', 'Income', 'Revenue from sales of goods', 1),
+  ('Cash Discount Received', 'Income', 'Discount received from suppliers', 1),
+  ('Interest Received', 'Income', 'Interest from bank deposits/FD', 1),
+  ('Commission Received', 'Income', 'Commission earned from business', 1),
+  ('Scrap Sales', 'Income', 'Sale of scrap material', 1),
+  ('Rental Income', 'Income', 'Income from property rent', 1),
+  ('TDS Refund', 'Income', 'TDS refund received', 1),
+  ('GST Refund', 'Income', 'GST refund from government', 1),
+  ('Bank Interest', 'Income', 'Interest credited by bank', 1),
+  ('Other Income', 'Income', 'Miscellaneous income', 1);
 `);
 //opening stock 
 db.exec(`
@@ -457,6 +491,11 @@ if (!defaultCashAccount) {
   );
 }
 
+  try {
+    runMigrations(db);
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+  }
 
 
   return db;

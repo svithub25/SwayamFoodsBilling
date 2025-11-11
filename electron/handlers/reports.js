@@ -63,7 +63,7 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
           if (existingAllocations && existingAllocations.length > 0) {
             // Use existing allocations (includes -1 for opening, -2 for current rate, -3 for estimated)
             itemCost = existingAllocations.reduce((sum, alloc) => sum + (alloc.cost_amount || 0), 0);
-            console.log(`Using existing cost allocation for sale_item ${saleItem.id}: ₹${itemCost}`);
+            // console.log(`Using existing cost allocation for sale_item ${saleItem.id}: ₹${itemCost}`);
           } else {
             // Need to allocate cost using FIFO
             let remainingQty = saleItem.quantity;

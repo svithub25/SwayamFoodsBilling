@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, Trash2, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, CheckCircle, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import TransactionModal from './modals/TransactionModal';
 import TransactionDetailsModal from './modals/TransactionDetailsModal';
 import ChequeStatusModal from './modals/ChequeStatusModal';
 import ConfirmModal from './modals/ConfirmModal';
 
-const BankingTransactions = () => {
+const BankingTransactions = ({ onTransactionChange }) => {
   const [transactions, setTransactions] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -15,6 +15,7 @@ const BankingTransactions = () => {
   const [showChequeModal, setShowChequeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   
@@ -97,6 +98,11 @@ const BankingTransactions = () => {
         loadTransactions();
         setShowDeleteConfirm(false);
         setDeleteId(null);
+        
+        // Trigger dashboard refresh
+        if (onTransactionChange) {
+          onTransactionChange();
+        }
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -199,6 +205,40 @@ const BankingTransactions = () => {
     }
     
     return pages;
+  };
+
+  const handleEdit = async (transaction) => {
+    // Check if transaction can be edited
+    if (transaction.reconciled === 1) {
+      toast.error('Cannot edit reconciled transaction');
+      return;
+    }
+    
+    if (transaction.cleared_status === 'Cleared' && transaction.cheque_number) {
+      toast.error('Cannot edit cleared cheque transaction');
+      return;
+    }
+    
+    try {
+      // Get full transaction details including to_account_id for Contra
+      const details = await window.electronAPI.getBankTransactionDetails(transaction.id);
+      
+      // For Contra transactions, find the destination account
+      if (details.voucher_type === 'Contra') {
+        const contraReceipt = transactions.find(
+          t => t.voucher_number === details.voucher_number + '-IN'
+        );
+        if (contraReceipt) {
+          details.to_account_id = contraReceipt.bank_account_id;
+        }
+      }
+      
+      setEditingTransaction(details);
+      setShowTransactionModal(true);
+    } catch (error) {
+      console.error('Error loading transaction for edit:', error);
+      toast.error('Failed to load transaction details');
+    }
   };
 
   return (
@@ -406,6 +446,17 @@ const BankingTransactions = () => {
                           <Eye className="w-4 h-4" />
                         </button>
                         
+                        {/* Edit Button - Only show if not reconciled and not cleared cheque */}
+                        {txn.reconciled !== 1 && !(txn.cleared_status === 'Cleared' && txn.cheque_number) && (
+                          <button
+                            onClick={() => handleEdit(txn)}
+                            className="text-indigo-600 hover:text-indigo-800"
+                            title="Edit Transaction"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        
                         {txn.cheque_number && txn.cleared_status !== 'Cleared' && txn.cleared_status !== 'Cancelled' && (
                           <button
                             onClick={() => handleChequeStatus(txn)}
@@ -509,8 +560,20 @@ const BankingTransactions = () => {
       {/* Modals */}
       <TransactionModal
         isOpen={showTransactionModal}
-        onClose={() => setShowTransactionModal(false)}
-        onSuccess={loadTransactions}
+        onClose={() => {
+          setShowTransactionModal(false);
+          setEditingTransaction(null);
+        }}
+        onSuccess={() => {
+          loadTransactions();
+          setEditingTransaction(null);
+          
+          // Trigger dashboard refresh
+          if (onTransactionChange) {
+            onTransactionChange();
+          }
+        }}
+        editData={editingTransaction}
       />
 
       <TransactionDetailsModal
@@ -523,7 +586,14 @@ const BankingTransactions = () => {
         isOpen={showChequeModal}
         onClose={() => setShowChequeModal(false)}
         transaction={selectedTransaction}
-        onStatusUpdate={loadTransactions}
+        onStatusUpdate={() => {
+          loadTransactions();
+          
+          // Trigger dashboard refresh
+          if (onTransactionChange) {
+            onTransactionChange();
+          }
+        }}
       />
 
       <ConfirmModal

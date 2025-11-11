@@ -3,6 +3,7 @@ import {
   BarChart3, TrendingUp, Calendar, Package, DollarSign, Users, RefreshCw, 
   ArrowUpRight, ArrowDownRight, Search, X
 } from 'lucide-react';
+import PinProtected from './reusables/PinProtected';
 import { Bar, Line } from 'react-chartjs-2';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -27,8 +28,8 @@ ChartJS.register(
   BarElement,
   ArcElement,
   Title,
-  Tooltip,
-  Legend
+  Tooltip, 
+  Legend 
 );
 
 const formatINR = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -531,6 +532,8 @@ const Analytics = () => {
   const { summary, itemAnalytics, topSellingItems, topPurchasedItems, vendors, customers, categories, dailyTrends, inventory: inventoryData } = analyticsData;
 
   return (
+    <>
+    <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
     <div className="space-y-6">
       {/* Header with Date Range */}
       <div className="flex flex-col sm:flex-row sm:items-center  gap-4">
@@ -989,7 +992,10 @@ const Analytics = () => {
           )}
         </div>
       </div>
-    </div>
+    </div> 
+     </PinProtected>
+    </>
+   
   );
 };
 

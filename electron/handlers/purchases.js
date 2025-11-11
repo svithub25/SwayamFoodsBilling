@@ -350,7 +350,7 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
 
       db.prepare('COMMIT').run();
       
-      console.log(`Purchase ${purchaseId} updated. Will recalculate ${salesToRecalculate.size} affected sales.`);
+      //console.log(`Purchase ${purchaseId} updated. Will recalculate ${salesToRecalculate.size} affected sales.`);
       
       return { success: true, salesToRecalculate: Array.from(salesToRecalculate) };
       

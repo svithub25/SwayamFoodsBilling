@@ -46,7 +46,6 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
   ipcMain.handle('add-bank-account', async (event, accountData) => {
     const db = getDb();
     try {
-    
       const result = db.prepare(`
         INSERT INTO bank_accounts 
         (account_name, account_number, bank_name, branch_name, ifsc_code, account_type, 
@@ -183,13 +182,17 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       }
       
       // Determine transaction type based on voucher type
+      // CORRECT LOGIC:
+      // - Payment = Money going OUT = DEBIT (decrease bank balance)
+      // - Receipt = Money coming IN = CREDIT (increase bank balance)
+      // - Contra = Transfer OUT from source = DEBIT (decrease source balance)
       let transactionType;
       if (transactionData.voucher_type === 'Payment') {
-        transactionType = 'Debit'; // Money going out
+        transactionType = 'Debit'; // Money going OUT
       } else if (transactionData.voucher_type === 'Receipt') {
-        transactionType = 'Credit'; // Money coming in
+        transactionType = 'Credit'; // Money coming IN
       } else if (transactionData.voucher_type === 'Contra') {
-        transactionType = 'Debit'; // Money going out from source account
+        transactionType = 'Debit'; // Money going OUT from source account
       }
       
       // Insert main transaction
@@ -224,7 +227,9 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       `);
       
       if (transactionData.voucher_type === 'Payment') {
-        // Payment: Debit Expense, Credit Bank
+        // Payment: Money OUT
+        // Debit: Expense/Party Account (increase expense)
+        // Credit: Bank Account (decrease bank balance)
         ledgerStmt.run(
           transactionId, 
           'Expense',
@@ -240,12 +245,14 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
           transactionData.amount
         );
         
-        // Update bank balance (decrease)
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+        // Update bank balance (DECREASE for payment)
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transactionData.amount, transactionData.bank_account_id);
           
       } else if (transactionData.voucher_type === 'Receipt') {
-        // Receipt: Debit Bank, Credit Income
+        // Receipt: Money IN
+        // Debit: Bank Account (increase bank balance)
+        // Credit: Income/Party Account (increase income)
         ledgerStmt.run(
           transactionId, 
           'Bank', 
@@ -261,8 +268,8 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
           transactionData.amount
         );
         
-        // Update bank balance (increase)
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?')
+        // Update bank balance (INCREASE for receipt)
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transactionData.amount, transactionData.bank_account_id);
           
       } else if (transactionData.voucher_type === 'Contra') {
@@ -283,7 +290,7 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
           transactionData.to_account_id,
           `Transfer from ${fromAccount.account_name}`,
           transactionData.amount,
-          'Debit', // Money coming in
+          'Credit', // Money coming IN to destination account
           transactionData.narration || `Transfer from ${fromAccount.account_name}`,
           'Cleared',
           transactionData.created_by || 'admin'
@@ -291,7 +298,7 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
         
         const contraReceiptId = contraReceiptResult.lastInsertRowid;
         
-        // Ledger entries for source account (payment side)
+        // Ledger entries for source account (payment side - money OUT)
         ledgerStmt.run(
           transactionId, 
           'Bank', 
@@ -307,7 +314,7 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
           transactionData.amount
         );
         
-        // Ledger entries for destination account (receipt side)
+        // Ledger entries for destination account (receipt side - money IN)
         ledgerStmt.run(
           contraReceiptId, 
           'Bank', 
@@ -324,12 +331,14 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
         );
         
         // Update both bank balances
+        // Source account: DECREASE (money OUT)
         db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transactionData.amount, transactionData.bank_account_id);
+        // Destination account: INCREASE (money IN)
         db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transactionData.amount, transactionData.to_account_id);
         
-        console.log(`Contra Transfer: ${fromAccount.account_name} → ${toAccount.account_name}: ₹${transactionData.amount}`);
+        console.log(`✅ Contra Transfer: ${fromAccount.account_name} → ${toAccount.account_name}: ₹${transactionData.amount}`);
       }
       
       // If it's a PDC (Post Dated Cheque) - Only for Payment/Receipt, not Contra
@@ -460,18 +469,21 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       }
       
       // Reverse bank balance based on transaction type
-      if (transaction.transaction_type === 'Credit') {
-        // Was a debit to bank (money out), so add it back
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?')
+      // CORRECT LOGIC:
+      // - If transaction was Debit (money OUT), add it back (increase balance)
+      // - If transaction was Credit (money IN), subtract it (decrease balance)
+      if (transaction.transaction_type === 'Debit') {
+        // Was money OUT, so add it back
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
-      } else if (transaction.transaction_type === 'Debit') {
-        // Was a credit to bank (money in), so subtract it
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+      } else if (transaction.transaction_type === 'Credit') {
+        // Was money IN, so subtract it
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
       }
       
       // Soft delete
-      db.prepare('UPDATE bank_transactions SET status_code = 1 WHERE id = ?').run(transactionId);
+      db.prepare('UPDATE bank_transactions SET status_code = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(transactionId);
       
       db.prepare('COMMIT').run();
       return { success: true };
@@ -481,171 +493,6 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       throw error;
     }
   });
-
-  // ==================== RECONCILIATION ====================
-  
-  // ipcMain.handle('get-unreconciled-transactions', async (event, bankAccountId) => {
-  //   const db = getDb();
-  //   return db.prepare(`
-  //     SELECT * FROM bank_transactions
-  //     WHERE bank_account_id = ?
-  //     AND reconciled = 0
-  //     AND cleared_status = 'Cleared'
-  //     AND status_code = 0
-  //     ORDER BY transaction_date
-  //   `).all(bankAccountId);
-  // });
-
-  // ipcMain.handle('reconcile-transactions', async (event, { bankAccountId, transactionIds, statementDate, statementBalance, reconciledBy }) => {
-  //   const db = getDb();
-  //   try {
-  //     db.prepare('BEGIN TRANSACTION').run();
-      
-  //     const placeholders = transactionIds.map(() => '?').join(',');
-  //     db.prepare(`
-  //       UPDATE bank_transactions 
-  //       SET reconciled = 1, reconciled_date = ?
-  //       WHERE id IN (${placeholders})
-  //     `).run(statementDate, ...transactionIds);
-      
-  //     const account = db.prepare('SELECT current_balance FROM bank_accounts WHERE id = ?').get(bankAccountId);
-      
-  //     db.prepare(`
-  //       INSERT INTO bank_reconciliation 
-  //       (bank_account_id, statement_date, statement_balance, book_balance, difference, reconciled_by)
-  //       VALUES (?, ?, ?, ?, ?, ?)
-  //     `).run(
-  //       bankAccountId,
-  //       statementDate,
-  //       statementBalance,
-  //       account.current_balance,
-  //       statementBalance - account.current_balance,
-  //       reconciledBy
-  //     );
-      
-  //     db.prepare('COMMIT').run();
-  //     return { success: true };
-  //   } catch (error) {
-  //     db.prepare('ROLLBACK').run();
-  //     console.error('Error reconciling transactions:', error);
-  //     throw error;
-  //   }
-  // });
-
-  // ipcMain.handle('get-reconciliation-history', async (event, bankAccountId) => {
-  //   const db = getDb();
-  //   return db.prepare(`
-  //     SELECT * FROM bank_reconciliation
-  //     WHERE bank_account_id = ?
-  //     ORDER BY statement_date DESC
-  //   `).all(bankAccountId);
-  // });
-
-  // ==================== PDC MANAGEMENT ====================
-  
-  // ipcMain.handle('get-pdc-list', async (event, filters) => {
-  //   const db = getDb();
-  //   let query = `
-  //     SELECT 
-  //       pdc.*,
-  //       bt.voucher_number,
-  //       bt.voucher_type,
-  //       bt.bank_account_id,
-  //       ba.account_name
-  //     FROM post_dated_cheques pdc
-  //     JOIN bank_transactions bt ON pdc.transaction_id = bt.id
-  //     JOIN bank_accounts ba ON bt.bank_account_id = ba.id
-  //     WHERE bt.status_code = 0
-  //   `;
-    
-  //   const params = [];
-    
-  //   if (filters?.status) {
-  //     query += ' AND pdc.status = ?';
-  //     params.push(filters.status);
-  //   }
-    
-  //   if (filters?.startDate && filters?.endDate) {
-  //     query += ' AND pdc.cheque_date BETWEEN ? AND ?';
-  //     params.push(filters.startDate, filters.endDate);
-  //   }
-    
-  //   query += ' ORDER BY pdc.cheque_date';
-    
-  //   return db.prepare(query).all(...params);
-  // });
-
-  // ipcMain.handle('update-pdc-status', async (event, { pdcId, status, notes, depositDate, clearedDate }) => {
-  //   const db = getDb();
-  //   try {
-  //     db.prepare('BEGIN TRANSACTION').run();
-      
-  //     const pdc = db.prepare('SELECT * FROM post_dated_cheques WHERE id = ?').get(pdcId);
-      
-  //     if (!pdc) {
-  //       throw new Error('PDC not found');
-  //     }
-      
-  //     // Update PDC record
-  //     const updateFields = [];
-  //     const updateValues = [];
-      
-  //     updateFields.push('status = ?');
-  //     updateValues.push(status);
-      
-  //     if (notes) {
-  //       updateFields.push('notes = ?');
-  //       updateValues.push(notes);
-  //     }
-      
-  //     if (depositDate) {
-  //       updateFields.push('deposit_date = ?');
-  //       updateValues.push(depositDate);
-  //     }
-      
-  //     if (clearedDate) {
-  //       updateFields.push('cleared_date = ?');
-  //       updateValues.push(clearedDate);
-  //     }
-      
-  //     updateFields.push('updated_at = CURRENT_TIMESTAMP');
-  //     updateValues.push(pdcId);
-      
-  //     const updateQuery = `UPDATE post_dated_cheques SET ${updateFields.join(', ')} WHERE id = ?`;
-  //     db.prepare(updateQuery).run(...updateValues);
-      
-  //     // Update related transaction cleared status
-  //     let newClearedStatus = 'Pending';
-  //     let transactionClearedDate = null;
-      
-  //     if (status === 'Cleared') {
-  //       newClearedStatus = 'Cleared';
-  //       transactionClearedDate = clearedDate || new Date().toISOString().split('T')[0];
-  //     } else if (status === 'Bounced') {
-  //       newClearedStatus = 'Bounced';
-  //       transactionClearedDate = null;
-  //     } else if (status === 'Cancelled') {
-  //       newClearedStatus = 'Cancelled';
-  //       transactionClearedDate = null;
-  //     } else if (status === 'Deposited') {
-  //       newClearedStatus = 'Pending';
-  //       transactionClearedDate = null;
-  //     }
-      
-  //     db.prepare(`
-  //       UPDATE bank_transactions 
-  //       SET cleared_status = ?, cleared_date = ?, updated_at = CURRENT_TIMESTAMP
-  //       WHERE id = ?
-  //     `).run(newClearedStatus, transactionClearedDate, pdc.transaction_id);
-      
-  //     db.prepare('COMMIT').run();
-  //     return { success: true };
-  //   } catch (error) {
-  //     db.prepare('ROLLBACK').run();
-  //     console.error('Error updating PDC status:', error);
-  //     throw error;
-  //   }
-  // });
 
   // ==================== CATEGORIES ====================
   
@@ -680,10 +527,55 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     }
   });
 
+  ipcMain.handle('update-transaction-category', async (event, categoryId, categoryData) => {
+    const db = getDb();
+    try {
+      // Check if category is default
+      const category = db.prepare('SELECT is_default FROM transaction_categories WHERE id = ?').get(categoryId);
+      
+      if (!category) {
+        throw new Error('Category not found');
+      }
+      
+      if (category.is_default === 1) {
+        throw new Error('Default categories cannot be edited');
+      }
+      
+      db.prepare(`
+        UPDATE transaction_categories 
+        SET category_name = ?, 
+            category_type = ?, 
+            description = ?
+        WHERE id = ? AND is_default = 0
+      `).run(
+        categoryData.category_name,
+        categoryData.category_type,
+        categoryData.description || '',
+        categoryId
+      );
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  });
+
   ipcMain.handle('delete-transaction-category', async (event, categoryId) => {
     const db = getDb();
     try {
-      db.prepare('UPDATE transaction_categories SET is_active = 0 WHERE id = ?').run(categoryId);
+      // Check if category is default
+      const category = db.prepare('SELECT is_default, category_name FROM transaction_categories WHERE id = ?').get(categoryId);
+      
+      if (!category) {
+        throw new Error('Category not found');
+      }
+      
+      if (category.is_default === 1) {
+        throw new Error(`Cannot delete default category: ${category.category_name}`);
+      }
+      
+      // Soft delete only non-default categories
+      db.prepare('UPDATE transaction_categories SET is_active = 0 WHERE id = ? AND is_default = 0').run(categoryId);
       return { success: true };
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -711,10 +603,11 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     `).all(bankAccountId, startDate, endDate);
     
     // Calculate opening balance as of start date
+    // CORRECT LOGIC: Opening Balance + Credits - Debits
     const priorTransactions = db.prepare(`
       SELECT 
-        SUM(CASE WHEN transaction_type = 'Debit' THEN amount ELSE 0 END) as total_debits,
-        SUM(CASE WHEN transaction_type = 'Credit' THEN amount ELSE 0 END) as total_credits
+        SUM(CASE WHEN transaction_type = 'Credit' THEN amount ELSE 0 END) as total_credits,
+        SUM(CASE WHEN transaction_type = 'Debit' THEN amount ELSE 0 END) as total_debits
       FROM bank_transactions
       WHERE bank_account_id = ?
       AND transaction_date < ?
@@ -722,12 +615,15 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     `).get(bankAccountId, startDate);
     
     const openingBalance = account.opening_balance + 
-      (priorTransactions.total_debits || 0) - 
-      (priorTransactions.total_credits || 0);
+      (priorTransactions.total_credits || 0) - 
+      (priorTransactions.total_debits || 0);
     
     let runningBalance = openingBalance;
     const transactionsWithBalance = transactions.map(txn => {
-      if (txn.transaction_type === 'Debit') {
+      // CORRECT LOGIC:
+      // Credit = Money IN = ADD to balance
+      // Debit = Money OUT = SUBTRACT from balance
+      if (txn.transaction_type === 'Credit') {
         runningBalance += txn.amount;
       } else {
         runningBalance -= txn.amount;
@@ -826,8 +722,8 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     
     const summary = db.prepare(`
       SELECT 
-        SUM(CASE WHEN transaction_type = 'Debit' THEN amount ELSE 0 END) as total_debits,
-        SUM(CASE WHEN transaction_type = 'Credit' THEN amount ELSE 0 END) as total_credits
+        SUM(CASE WHEN transaction_type = 'Credit' THEN amount ELSE 0 END) as total_credits,
+        SUM(CASE WHEN transaction_type = 'Debit' THEN amount ELSE 0 END) as total_debits
       FROM bank_transactions
       WHERE DATE(transaction_date) = ?
       AND status_code = 0
@@ -835,11 +731,15 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     
     return {
       transactions,
-      summary
+      summary: {
+        total_receipts: summary.total_credits || 0,
+        total_payments: summary.total_debits || 0,
+        net_cashflow: (summary.total_credits || 0) - (summary.total_debits || 0)
+      }
     };
   });
 
-  // ==================== CHEQUE DEPOSIT & STATUS ====================
+  // ==================== CHEQUE MANAGEMENT ====================
   
   ipcMain.handle('deposit-cheque', async (event, { transactionId, depositDate, depositBank }) => {
     const db = getDb();
@@ -852,7 +752,7 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
         throw new Error('Transaction not found');
       }
       
-      if (transaction.payment_mode !== 'Cheque') {
+      if (!transaction.cheque_number) {
         throw new Error('This transaction is not a cheque payment');
       }
       
@@ -943,11 +843,13 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       `).run(bounceDate, `Cheque Bounced: ${bounceReason}`, transactionId);
       
       // Reverse bank balance
+      // If it was Debit (money OUT), add it back
+      // If it was Credit (money IN), subtract it
       if (transaction.transaction_type === 'Debit') {
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
       } else {
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?')
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
       }
       
@@ -980,7 +882,7 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
         throw new Error('Transaction not found');
       }
       
-      // Mark as cancelled (soft delete)
+      // Mark as cancelled
       db.prepare(`
         UPDATE bank_transactions 
         SET cleared_status = 'Cancelled',
@@ -991,10 +893,10 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
       
       // Reverse bank balance
       if (transaction.transaction_type === 'Debit') {
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
       } else {
-        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?')
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(transaction.amount, transaction.bank_account_id);
       }
       
@@ -1016,185 +918,390 @@ export function registerBankingHandlers({ ipcMain, getDb }) {
     }
   });
 
+  // ==================== PARTY MANAGEMENT ====================
 
-// ==================== PARTY MANAGEMENT ====================
+  ipcMain.handle('get-all-parties', async (event, partyType = null) => {
+    const db = getDb();
+    const parties = [];
+    
+    try {
+      // Get Categories (Income/Expense)
+      if (!partyType || partyType === 'category') {
+        const categories = db.prepare(`
+          SELECT 
+            'category' as source_type,
+            category_name as name,
+            category_type as type,
+            description
+          FROM transaction_categories 
+          WHERE is_active = 1
+          ORDER BY category_name 
+        `).all();
+        parties.push(...categories);
+      }
+      
+      // Get Suppliers
+      if (!partyType || partyType === 'supplier') {
+        const suppliers = db.prepare(`
+          SELECT 
+            'supplier' as source_type,
+            name,
+            contact,
+            gstin,
+            'Supplier' as type
+          FROM suppliers 
+          WHERE status_code = 0
+          ORDER BY name
+        `).all();
+        parties.push(...suppliers);
+      }
+      
+      // Get Customers
+      if (!partyType || partyType === 'customer') {
+        const customers = db.prepare(`
+         SELECT 
+            'customer' as source_type,
+            name,
+            contact,
+            gstin,
+            'Customer' as type 
+          FROM customer 
+          WHERE status_code = 0
+          ORDER BY name
+        `).all();
+        parties.push(...customers);
+      }
+      
+      // Get Salesmen
+      if (!partyType || partyType === 'salesman') {
+        const salesmen = db.prepare(`
+          SELECT 
+            'salesman' as source_type,
+            name,
+            contact_info as contact,
+            'Salesman' as type
+          FROM salesman 
+          WHERE status_code = 0
+          ORDER BY name
+        `).all();
+        parties.push(...salesmen);
+      }
+      
+      // Get recent unique party names from transactions (for suggestions)
+      if (!partyType || partyType === 'recent') {
+        const recentParties = db.prepare(`
+          SELECT DISTINCT 
+            'recent' as source_type,
+            party_name as name,
+            'Recent Transaction' as type
+          FROM bank_transactions 
+          WHERE party_name IS NOT NULL 
+          AND party_name != ''
+          AND status_code = 0
+          ORDER BY created_at DESC
+          LIMIT 50
+        `).all();
+        
+        // Filter out duplicates that already exist in other sources
+        const existingNames = new Set(parties.map(p => p.name?.toLowerCase()));
+        const uniqueRecent = recentParties.filter(
+          p => p.name && !existingNames.has(p.name.toLowerCase())
+        );
+        parties.push(...uniqueRecent);
+      }
+      
+      return parties;
+    } catch (error) {
+      console.error('Error fetching parties:', error);
+      throw error;
+    }
+  });
 
-ipcMain.handle('get-all-parties', async (event, partyType = null) => {
-  const db = getDb();
-  const parties = [];
-  
-  try {
-    // Get Categories (Income/Expense)
-    if (!partyType || partyType === 'category') {
+  ipcMain.handle('search-parties', async (event, searchTerm) => {
+    const db = getDb();
+    const parties = [];
+    
+    if (!searchTerm || searchTerm.length < 2) {
+      return parties;
+    }
+    
+    const searchPattern = `%${searchTerm}%`;
+    
+    try {
+      // Search in categories
       const categories = db.prepare(`
         SELECT 
           'category' as source_type,
+          id,
           category_name as name,
           category_type as type,
           description
         FROM transaction_categories 
         WHERE is_active = 1
-        ORDER BY category_name 
-      `).all();
+        AND category_name LIKE ?
+        ORDER BY category_name
+        LIMIT 10
+      `).all(searchPattern);
       parties.push(...categories);
-    }
-    
-    // Get Suppliers
-    if (!partyType || partyType === 'supplier') {
+      
+      // Search in suppliers
       const suppliers = db.prepare(`
         SELECT 
           'supplier' as source_type,
+          id,
           name,
           contact,
-          gstin,
           'Supplier' as type
         FROM suppliers 
         WHERE status_code = 0
+        AND name LIKE ?
         ORDER BY name
-      `).all();
+        LIMIT 10
+      `).all(searchPattern);
       parties.push(...suppliers);
-    }
-    
-    // Get Customers
-    if (!partyType || partyType === 'customer') {
+      
+      // Search in customers
       const customers = db.prepare(`
-       SELECT 
+        SELECT 
           'customer' as source_type,
+          id,
           name,
           contact,
-          gstin,
-          'Customer' as type 
+          'Customer' as type
         FROM customer 
         WHERE status_code = 0
+        AND name LIKE ?
         ORDER BY name
-      `).all();
+        LIMIT 10
+      `).all(searchPattern);
       parties.push(...customers);
-    }
-    
-    // Get Salesmen
-    if (!partyType || partyType === 'salesman') {
+      
+      // Search in salesmen
       const salesmen = db.prepare(`
         SELECT 
           'salesman' as source_type,
+          id,
           name,
           contact_info as contact,
           'Salesman' as type
         FROM salesman 
         WHERE status_code = 0
+        AND name LIKE ?
         ORDER BY name
-      `).all();
+        LIMIT 10
+      `).all(searchPattern);
       parties.push(...salesmen);
-    }
-    
-    // Get recent unique party names from transactions (for suggestions)
-    if (!partyType || partyType === 'recent') {
-      const recentParties = db.prepare(`
-        SELECT DISTINCT 
-          'recent' as source_type,
-          party_name as name,
-          'Recent Transaction' as type
-        FROM bank_transactions 
-        WHERE party_name IS NOT NULL 
-        AND party_name != ''
-        AND status_code = 0
-        ORDER BY created_at DESC
-        LIMIT 50
-      `).all();
       
-      // Filter out duplicates that already exist in other sources
-      const existingNames = new Set(parties.map(p => p.name?.toLowerCase()));
-      const uniqueRecent = recentParties.filter(
-        p => p.name && !existingNames.has(p.name.toLowerCase())
-      );
-      parties.push(...uniqueRecent);
+      return parties;
+    } catch (error) {
+      console.error('Error searching parties:', error);
+      throw error;
     }
-    
-    return parties;
-  } catch (error) {
-    console.error('Error fetching parties:', error);
-    throw error;
-  }
-});
+  });
 
-ipcMain.handle('search-parties', async (event, searchTerm) => {
-  const db = getDb();
-  const parties = [];
-  
-  if (!searchTerm || searchTerm.length < 2) {
-    return parties;
-  }
-  
-  const searchPattern = `%${searchTerm}%`;
-  
-  try {
-    // Search in categories
-    const categories = db.prepare(`
-      SELECT 
-        'category' as source_type,
-        id,
-        category_name as name,
-        category_type as type,
-        description
-      FROM transaction_categories 
-      WHERE is_active = 1
-      AND category_name LIKE ?
-      ORDER BY category_name
-      LIMIT 10
-    `).all(searchPattern);
-    parties.push(...categories);
+  // Add this new handler after save-bank-transaction
+  ipcMain.handle('update-bank-transaction', async (event, transactionId, transactionData) => {
+    const db = getDb();
     
-    // Search in suppliers
-    const suppliers = db.prepare(`
-      SELECT 
-        'supplier' as source_type,
-        id,
-        name,
-        contact,
-        'Supplier' as type
-      FROM suppliers 
-      WHERE status_code = 0
-      AND name LIKE ?
-      ORDER BY name
-      LIMIT 10
-    `).all(searchPattern);
-    parties.push(...suppliers);
+    try {
+      db.prepare('BEGIN TRANSACTION').run();
+      
+      // Get old transaction details
+      const oldTransaction = db.prepare('SELECT * FROM bank_transactions WHERE id = ?').get(transactionId);
+      
+      if (!oldTransaction) {
+        throw new Error('Transaction not found');
+      }
+      
+      // Check if transaction can be edited (not reconciled, not cleared cheque, etc.)
+      if (oldTransaction.reconciled === 1) {
+        throw new Error('Cannot edit reconciled transaction');
+      }
+      
+      if (oldTransaction.cleared_status === 'Cleared' && oldTransaction.cheque_number) {
+        throw new Error('Cannot edit cleared cheque transaction');
+      }
+      
+      // Reverse old transaction's bank balance
+      if (oldTransaction.transaction_type === 'Debit') {
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?')
+          .run(oldTransaction.amount, oldTransaction.bank_account_id);
+      } else {
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+          .run(oldTransaction.amount, oldTransaction.bank_account_id);
+      }
+      
+      // If old transaction was Contra, reverse destination account too
+      if (oldTransaction.voucher_type === 'Contra') {
+        const oldContraReceipt = db.prepare(
+          'SELECT * FROM bank_transactions WHERE voucher_number = ? AND id != ?'
+        ).get(oldTransaction.voucher_number + '-IN', transactionId);
+        
+        if (oldContraReceipt) {
+          if (oldContraReceipt.transaction_type === 'Credit') {
+            db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?')
+              .run(oldContraReceipt.amount, oldContraReceipt.bank_account_id);
+          }
+          // Delete old contra receipt transaction
+          db.prepare('UPDATE bank_transactions SET status_code = 1 WHERE id = ?').run(oldContraReceipt.id);
+        }
+      }
+      
+      // Delete old ledger entries
+      db.prepare('DELETE FROM bank_ledger_entries WHERE transaction_id = ?').run(transactionId);
+      
+      // Delete old PDC if exists
+      db.prepare('DELETE FROM post_dated_cheques WHERE transaction_id = ?').run(transactionId);
+      
+      // Get source account details for new transaction
+      const fromAccount = db.prepare('SELECT account_name FROM bank_accounts WHERE id = ?')
+        .get(transactionData.bank_account_id);
     
-    // Search in customers
-    const customers = db.prepare(`
-      SELECT 
-        'customer' as source_type,
-        id,
-        name,
-        contact,
-        'Customer' as type
-      FROM customer 
-      WHERE status_code = 0
-      AND name LIKE ?
-      ORDER BY name
-      LIMIT 10
-    `).all(searchPattern);
-    parties.push(...customers);
+      if (!fromAccount) {
+        throw new Error('Source bank account not found');
+      }
+      
+      // For Contra, validate destination account
+      if (transactionData.voucher_type === 'Contra') {
+        if (!transactionData.to_account_id) {
+          throw new Error('Destination account is required for Contra transaction');
+        }
+        
+        if (transactionData.bank_account_id === transactionData.to_account_id) {
+          throw new Error('Source and destination accounts cannot be the same');
+        }
+        
+        const toAccount = db.prepare('SELECT account_name FROM bank_accounts WHERE id = ?')
+          .get(transactionData.to_account_id);
+        
+        if (!toAccount) {
+          throw new Error('Destination bank account not found');
+        }
+        
+        transactionData.party_name = `Transfer to ${toAccount.account_name}`;
+      }
+      
+      // Determine transaction type
+      let transactionType;
+      if (transactionData.voucher_type === 'Payment') {
+        transactionType = 'Debit';
+      } else if (transactionData.voucher_type === 'Receipt') {
+        transactionType = 'Credit';
+      } else if (transactionData.voucher_type === 'Contra') {
+        transactionType = 'Debit';
+      }
+      
+      // Update main transaction
+      db.prepare(`
+        UPDATE bank_transactions SET
+          voucher_type = ?,
+          transaction_date = ?,
+          bank_account_id = ?,
+          party_name = ?,
+          amount = ?,
+          transaction_type = ?,
+          cheque_number = ?,
+          cheque_date = ?,
+          narration = ?,
+          cleared_status = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        transactionData.voucher_type,
+        transactionData.transaction_date,
+        transactionData.bank_account_id,
+        transactionData.party_name || '',
+        transactionData.amount,
+        transactionType,
+        transactionData.cheque_number || null,
+        transactionData.cheque_date || null,
+        transactionData.narration || '',
+        transactionData.cheque_number ? 'Pending' : 'Cleared',
+        transactionId
+      );
     
-    // Search in salesmen
-    const salesmen = db.prepare(`
-      SELECT 
-        'salesman' as source_type,
-        id,
-        name,
-        contact_info as contact,
-        'Salesman' as type
-      FROM salesman 
-      WHERE status_code = 0
-      AND name LIKE ?
-      ORDER BY name
-      LIMIT 10
-    `).all(searchPattern);
-    parties.push(...salesmen);
+      // Insert new ledger entries
+      const ledgerStmt = db.prepare(`
+        INSERT INTO bank_ledger_entries 
+        (transaction_id, ledger_type, ledger_name, debit_amount, credit_amount)
+        VALUES (?, ?, ?, ?, ?)
+      `);
     
-    return parties;
-  } catch (error) {
-    console.error('Error searching parties:', error);
-    throw error;
-  }
-});
+      if (transactionData.voucher_type === 'Payment') {
+        ledgerStmt.run(transactionId, 'Expense', transactionData.party_name, transactionData.amount, 0);
+        ledgerStmt.run(transactionId, 'Bank', fromAccount.account_name, 0, transactionData.amount);
+        
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(transactionData.amount, transactionData.bank_account_id);
+          
+      } else if (transactionData.voucher_type === 'Receipt') {
+        ledgerStmt.run(transactionId, 'Bank', fromAccount.account_name, transactionData.amount, 0);
+        ledgerStmt.run(transactionId, 'Income', transactionData.party_name, 0, transactionData.amount);
+        
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(transactionData.amount, transactionData.bank_account_id);
+          
+      } else if (transactionData.voucher_type === 'Contra') {
+        const toAccount = db.prepare('SELECT account_name FROM bank_accounts WHERE id = ?')
+          .get(transactionData.to_account_id);
+        
+        // Create new contra receipt transaction
+        const contraReceiptResult = db.prepare(`
+          INSERT INTO bank_transactions 
+          (voucher_number, voucher_type, transaction_date, bank_account_id, party_name, 
+           amount, transaction_type, narration, cleared_status, created_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          oldTransaction.voucher_number + '-IN',
+          'Contra',
+          transactionData.transaction_date,
+          transactionData.to_account_id,
+          `Transfer from ${fromAccount.account_name}`,
+          transactionData.amount,
+          'Credit',
+          transactionData.narration || `Transfer from ${fromAccount.account_name}`,
+          'Cleared',
+          transactionData.created_by || 'admin'
+        );
+        
+        const contraReceiptId = contraReceiptResult.lastInsertRowid;
+        
+        // Ledger entries
+        ledgerStmt.run(transactionId, 'Bank', toAccount.account_name, transactionData.amount, 0);
+        ledgerStmt.run(transactionId, 'Bank', fromAccount.account_name, 0, transactionData.amount);
+        ledgerStmt.run(contraReceiptId, 'Bank', toAccount.account_name, transactionData.amount, 0);
+        ledgerStmt.run(contraReceiptId, 'Bank', fromAccount.account_name, 0, transactionData.amount);
+        
+        // Update balances
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(transactionData.amount, transactionData.bank_account_id);
+        db.prepare('UPDATE bank_accounts SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(transactionData.amount, transactionData.to_account_id);
+      }
+    
+      // If PDC
+      if (transactionData.is_pdc && transactionData.cheque_number && transactionData.voucher_type !== 'Contra') {
+        db.prepare(`
+          INSERT INTO post_dated_cheques 
+          (transaction_id, cheque_number, cheque_date, amount, party_name, bank_name, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'Pending')
+        `).run(
+          transactionId,
+          transactionData.cheque_number,
+          transactionData.cheque_date,
+          transactionData.amount,
+          transactionData.party_name,
+          transactionData.bank_name || ''
+        );
+      }
+      
+      db.prepare('COMMIT').run();
+      return { success: true, transactionId };
+      
+    } catch (error) {
+      db.prepare('ROLLBACK').run();
+      console.error('Error updating transaction:', error);
+      throw error;
+    }
+  });
 }

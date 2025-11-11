@@ -25,6 +25,7 @@ function BankingReports({ bankAccounts }) {
         startDate: filters.startDate,
         endDate: filters.endDate
       });
+      console.log('Bank Statement data:', data);
       setReportData(data);
     } catch (error) {
       console.error('Error generating bank statement:', error);
@@ -41,6 +42,7 @@ function BankingReports({ bankAccounts }) {
         startDate: filters.startDate,
         endDate: filters.endDate
       });
+      console.log('Cashflow Report data:', data);
       setReportData(data);
     } catch (error) {
       console.error('Error generating cashflow report:', error);
@@ -56,6 +58,7 @@ function BankingReports({ bankAccounts }) {
       const data = await window.electronAPI.getDaybook({
         date: filters.startDate
       });
+      console.log('Daybook data:', data);
       setReportData(data);
     } catch (error) {
       console.error('Error generating daybook:', error);
@@ -187,14 +190,14 @@ function BankingReports({ bankAccounts }) {
             >
               {loading ? 'Generating...' : 'Generate'}
             </button>
-            {reportData && (
+            {/* {reportData && (
               <button
                 onClick={handleExportReport}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Download className="w-5 h-5" />
               </button>
-            )}
+            )} */}
           </div>
         </div>
       </div>
@@ -226,12 +229,14 @@ function BankingReports({ bankAccounts }) {
                   <p className="text-sm text-gray-600">Opening Balance</p>
                   <p className={`text-2xl font-bold ${reportData.openingBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     ₹{Math.abs(reportData.openingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {/* <span className="text-sm ml-2">{reportData.openingBalance >= 0 ? 'Dr' : 'Cr'}</span> */}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Closing Balance</p>
                   <p className={`text-2xl font-bold ${reportData.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     ₹{Math.abs(reportData.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {/* <span className="text-sm ml-2">{reportData.closingBalance >= 0 ? 'Dr' : 'Cr'}</span> */}
                   </p>
                 </div>
               </div>
@@ -242,9 +247,16 @@ function BankingReports({ bankAccounts }) {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Debits
+                        {/* <div className="text-xs text-red-600 font-normal">(Money OUT)</div> */}
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Credits
+                        {/* <div className="text-xs text-green-600 font-normal">(Money IN)</div> */}
+                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balance</th>
                     </tr>
                   </thead>
@@ -257,34 +269,87 @@ function BankingReports({ bankAccounts }) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
                           {txn.voucher_number}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full
+                            ${txn.voucher_type === 'Payment' ? 'bg-red-100 text-red-800' : ''}
+                            ${txn.voucher_type === 'Receipt' ? 'bg-green-100 text-green-800' : ''}
+                            ${txn.voucher_type === 'Contra' ? 'bg-blue-100 text-blue-800' : ''}
+                          `}>
+                            {txn.voucher_type}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-900">
-                          <div>{txn.party_name || '-'}</div>
+                          <div className="font-medium">{txn.party_name || '-'}</div>
                           {txn.narration && (
-                            <div className="text-xs text-gray-500">{txn.narration}</div>
+                            <div className="text-xs text-gray-500 mt-1">{txn.narration}</div>
+                          )}
+                          {txn.cheque_number && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Cheque: {txn.cheque_number}
+                              {txn.cleared_status && (
+                                <span className={`ml-2 px-1 py-0.5 rounded text-xs
+                                  ${txn.cleared_status === 'Cleared' ? 'bg-green-100 text-green-800' : ''}
+                                  ${txn.cleared_status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : ''}
+                                  ${txn.cleared_status === 'Bounced' ? 'bg-red-100 text-red-800' : ''}
+                                `}>
+                                  {txn.cleared_status}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
                           {txn.transaction_type === 'Debit' ? (
-                            <span className="text-green-600">
-                              ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
-                          {txn.transaction_type === 'Credit' ? (
                             <span className="text-red-600">
                               ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
-                          ) : '-'}
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
+                          {txn.transaction_type === 'Credit' ? (
+                            <span className="text-green-600">
+                              ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
                           <span className={txn.running_balance >= 0 ? 'text-green-600' : 'text-red-600'}>
                             ₹{Math.abs(txn.running_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
+                          {/* <span className="text-xs ml-1">{txn.running_balance >= 0 ? 'Dr' : 'Cr'}</span> */}
                         </td>
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot className="bg-gray-50 font-semibold">
+                    <tr>
+                      <td colSpan="4" className="px-6 py-4 text-right text-sm text-gray-700">
+                        Total:
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-red-600">
+                        ₹{reportData.transactions
+                          .filter(t => t.transaction_type === 'Debit')
+                          .reduce((sum, t) => sum + t.amount, 0)
+                          .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-green-600">
+                        ₹{reportData.transactions
+                          .filter(t => t.transaction_type === 'Credit')
+                          .reduce((sum, t) => sum + t.amount, 0)
+                          .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm">
+                        <span className={reportData.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          ₹{Math.abs(reportData.closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          {/* <span className="text-xs ml-1">{reportData.closingBalance >= 0 ? 'Dr' : 'Cr'}</span> */}
+                        </span>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -299,6 +364,7 @@ function BankingReports({ bankAccounts }) {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Total Receipts</p>
+                      {/* <p className="text-xs text-gray-500 mb-1">(Money IN - Credits)</p> */}
                       <p className="text-2xl font-bold text-green-600">
                         ₹{reportData.totalReceipts.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
@@ -312,6 +378,7 @@ function BankingReports({ bankAccounts }) {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Total Payments</p>
+                      {/* <p className="text-xs text-gray-500 mb-1">(Money OUT - Debits)</p> */}
                       <p className="text-2xl font-bold text-red-600">
                         ₹{reportData.totalPayments.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
@@ -325,67 +392,86 @@ function BankingReports({ bankAccounts }) {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Net Cashflow</p>
+                      <p className="text-xs text-gray-500 mb-1">(Receipts - Payments)</p>
                       <p className={`text-2xl font-bold ${reportData.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         ₹{Math.abs(reportData.netCashFlow).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {reportData.netCashFlow >= 0 ? 'Positive' : 'Negative'} Flow
+                        {reportData.netCashFlow >= 0 ? 'Surplus' : 'Deficit'}
                       </p>
                     </div>
-                    <DollarSign className="w-12 h-12 text-blue-500" />
+                    <DollarSign className={`w-12 h-12 ${reportData.netCashFlow >= 0 ? 'text-green-500' : 'text-red-500'}`} />
                   </div>
                 </div>
               </div>
 
               {/* Income by Category */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Income by Category</h3>
-                <div className="space-y-3">
-                  {reportData.incomeByCategory.map((cat, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-700">{cat.category}</span>
-                          <span className="text-sm font-semibold text-green-600">
-                            ₹{cat.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-green-500 h-2 rounded-full"
-                            style={{ width: `${(cat.amount / reportData.totalReceipts) * 100}%` }}
-                          />
+              {reportData.incomeByCategory && reportData.incomeByCategory.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <TrendingUp className="w-5 h-5 text-green-600 mr-2" />
+                    Income by Category 
+                  </h3>
+                  <div className="space-y-3">
+                    {reportData.incomeByCategory.map((cat, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-700">{cat.category}</span>
+                            <span className="text-sm font-semibold text-green-600">
+                              ₹{cat.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              <span className="text-xs text-gray-500 ml-2">({cat.count} txn{cat.count > 1 ? 's' : ''})</span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-green-500 h-2 rounded-full transition-all"
+                              style={{ width: `${Math.min((cat.amount / reportData.totalReceipts) * 100, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {((cat.amount / reportData.totalReceipts) * 100).toFixed(1)}% of total receipts
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Expenses by Category */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Expenses by Category</h3>
-                <div className="space-y-3">
-                  {reportData.expenseByCategory.map((cat, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-700">{cat.category}</span>
-                          <span className="text-sm font-semibold text-red-600">
-                            ₹{cat.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-red-500 h-2 rounded-full"
-                            style={{ width: `${(cat.amount / reportData.totalPayments) * 100}%` }}
-                          />
+              {reportData.expenseByCategory && reportData.expenseByCategory.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <TrendingDown className="w-5 h-5 text-red-600 mr-2" />
+                    Expenses by Category 
+                  </h3>
+                  <div className="space-y-3">
+                    {reportData.expenseByCategory.map((cat, index) => (
+                      <div key={index} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-700">{cat.category}</span>
+                            <span className="text-sm font-semibold text-red-600">
+                              ₹{cat.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              <span className="text-xs text-gray-500 ml-2">({cat.count} txn{cat.count > 1 ? 's' : ''})</span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-red-500 h-2 rounded-full transition-all"
+                              style={{ width: `${Math.min((cat.amount / reportData.totalPayments) * 100, 100)}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {((cat.amount / reportData.totalPayments) * 100).toFixed(1)}% of total payments
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -405,17 +491,26 @@ function BankingReports({ bankAccounts }) {
                 </div>
               </div>
 
-              <div className="p-6 bg-gray-50 grid grid-cols-2 gap-6">
+              <div className="p-6 bg-gray-50 grid grid-cols-3 gap-6">
                 <div>
                   <p className="text-sm text-gray-600">Total Debits</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  {/* <p className="text-xs text-gray-500 mb-1">(Debits)</p> */}
+                  <p className="text-2xl font-bold text-red-600">
                     ₹{(reportData.summary?.total_debits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total Credits</p>
-                  <p className="text-2xl font-bold text-red-600">
+                  {/* <p className="text-xs text-gray-500 mb-1">(Credits)</p> */}
+                  <p className="text-2xl font-bold text-green-600">
                     ₹{(reportData.summary?.total_credits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Net Amount</p>
+                  <p className="text-xs text-gray-500 mb-1">(Credits - Debits)</p>
+                  <p className={`text-2xl font-bold ${reportData.summary?.net_cashflow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ₹{Math.abs(reportData.summary?.net_cashflow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -428,8 +523,14 @@ function BankingReports({ bankAccounts }) {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Debits
+                        {/* <div className="text-xs text-red-600 font-normal">(OUT)</div> */}
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Credits
+                        {/* <div className="text-xs text-green-600 font-normal">(IN)</div> */}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -456,29 +557,51 @@ function BankingReports({ bankAccounts }) {
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">{txn.account_name}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">
-                            <div>{txn.party_name || '-'}</div>
+                            <div className="font-medium">{txn.party_name || '-'}</div>
                             {txn.narration && (
-                              <div className="text-xs text-gray-500">{txn.narration}</div>
+                              <div className="text-xs text-gray-500 mt-1">{txn.narration}</div>
+                            )}
+                            {txn.cheque_number && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                Cheque: {txn.cheque_number}
+                              </div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
                             {txn.transaction_type === 'Debit' ? (
-                              <span className="text-green-600">
-                                ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                              </span>
-                            ) : '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
-                            {txn.transaction_type === 'Credit' ? (
                               <span className="text-red-600">
                                 ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </span>
-                            ) : '-'}
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold">
+                            {txn.transaction_type === 'Credit' ? (
+                              <span className="text-green-600">
+                                ₹{txn.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
+                  <tfoot className="bg-gray-50 font-semibold">
+                    <tr>
+                      <td colSpan="4" className="px-6 py-4 text-right text-sm text-gray-700">
+                        Total:
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-red-600">
+                        ₹{(reportData.summary?.total_debits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm text-green-600">
+                        ₹{(reportData.summary?.total_credits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
