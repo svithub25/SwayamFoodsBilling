@@ -78,6 +78,35 @@ const channelGroups = {
   analytics: {
     getAnalyticsData: 'get-analytics-data'
   },
+  banking: {
+    getBankAccounts: 'get-bank-accounts',
+    getBankAccountDetails: 'get-bank-account-details',
+    addBankAccount: 'add-bank-account',
+    updateBankAccount: 'update-bank-account',
+    deleteBankAccount: 'delete-bank-account',
+    generateVoucherNumber: 'generate-voucher-number',
+    saveBankTransaction: 'save-bank-transaction',
+    getBankTransactions: 'get-bank-transactions',
+    getBankTransactionDetails: 'get-bank-transaction-details',
+    updateChequeStatus: 'update-cheque-status',
+    deleteBankTransaction: 'delete-bank-transaction',
+    depositCheque: 'deposit-cheque',
+    clearCheque: 'clear-cheque',
+    bounceCheque: 'bounce-cheque',
+    cancelCheque: 'cancel-cheque',
+    getUnreconciledTransactions: 'get-unreconciled-transactions',
+    reconcileTransactions: 'reconcile-transactions',
+    getReconciliationHistory: 'get-reconciliation-history',
+    getPdcList: 'get-pdc-list',
+    updatePdcStatus: 'update-pdc-status',
+    getAllParties: 'get-all-parties',
+    getTransactionCategories: 'get-transaction-categories',
+    addTransactionCategory: 'add-transaction-category',
+    deleteTransactionCategory: 'delete-transaction-category',
+    getBankStatement: 'get-bank-statement',
+    getCashflowReport: 'get-cashflow-report',
+    getDaybook: 'get-daybook'
+  },
   backup: {
     backupDatabase: 'backup-database',
     restoreDatabase: 'restore-database',
@@ -111,13 +140,27 @@ const channelGroups = {
     getExportSalesData: 'get-export-sales-data',
     getExportPurchaseData: 'get-export-purchase-data'
   },
-  closingStock: {
-    updateClosingStock: 'update-closing-stock',
-    getClosingStock: 'get-closing-stock'
+  openingStock: {
+    setOpeningStock: 'set-opening-stock',
+    getOpeningStock: 'get-opening-stock',
+    getAllOpeningStock: 'get-all-opening-stock',
+    lockOpeningStock: 'lock-opening-stock',
+    unlockOpeningStock: 'unlock-opening-stock',
+    lockAllOpeningStocks: 'lock-all-opening-stocks',
+    calculateOpeningFromClosing: 'calculate-opening-from-closing'
   },
+  // closingStock: {
+  //   updateClosingStock: 'update-closing-stock',
+  //   getClosingStock: 'get-closing-stock',
+  //   calculateClosingStock: 'calculate-closing-stock'
+  // },
   messages: {
     getBillMessage: 'get-bill-message',
     setBillMessage: 'set-bill-message'
+  },
+   financialReports: {
+    getProfitAndLoss: 'get-profit-and-loss',
+    getBalanceSheet: 'get-balance-sheet'
   },
   printing: {
     printPdf: 'print-pdf'
@@ -132,6 +175,9 @@ const electronAPI = Object.entries(channelGroups).reduce((api, [, channels]) => 
   });
   return api;
 }, {});
+
+// Add openExternal method separately
+electronAPI.openExternal = (url) => ipcRenderer.invoke('open-external', url);
 
 electronAPI.getExportSalesData = (startDateOrParams, maybeEndDate) => {
   const payload =

@@ -247,14 +247,19 @@ const buildProductPayload = (form) => ({
         const payload = buildProductPayload(productForm);
         const newProduct = await window.electronAPI.addItem(payload);
 
-        // --- Update closing stock after adding product ---
-        await window.electronAPI.updateClosingStock({
-          itemId: newProduct.id,
-          qty: payload.current_stock,
-          purchaseRate: payload.purchase_rate
-        });
+        // --- NEW: Set opening stock when adding product ---
+        if (payload.current_stock > 0) {
+          await window.electronAPI.setOpeningStock({
+            itemId: newProduct.id,
+            qty: payload.current_stock,
+            rate: payload.purchase_rate,
+            date: new Date().toISOString().split('T')[0]
+          });
+          toast.success('Product added with opening stock');
+        } else {
+          toast.success('Product added successfully');
+        }
 
-        toast.success('Product added successfully');
         setProducts([...products, newProduct]);
       }
       setShowProductForm(false);
@@ -264,6 +269,8 @@ const buildProductPayload = (form) => ({
       if (error?.message?.includes('SKU already exists')) {
         setProductErrors({ ...productErrors, sku: 'SKU already exists' });
         toast.error('SKU already exists');
+      } else if (error?.message?.includes('locked')) {
+        toast.error('Opening stock is locked and cannot be modified');
       } else {
         toast.error('Error adding product');
         console.error('Error adding product:', error);
@@ -285,17 +292,46 @@ const buildProductPayload = (form) => ({
           toast.error('SKU already exists');
           return;
         }
+
+        // Get existing item data
+        const existingItem = products.find(p => p.id === editingItem);
         const payload = { id: editingItem, ...buildProductPayload(productForm) };
+        
         await window.electronAPI.updateItem(payload);
 
-        // --- Update closing stock after editing product ---
-        await window.electronAPI.updateClosingStock({
-          itemId: editingItem,
-          qty: payload.current_stock,
-          purchaseRate: payload.purchase_rate
-        });
+        // --- NEW: Update opening stock ONLY if it's not locked ---
+        try {
+          const openingStock = await window.electronAPI.getOpeningStock(editingItem);
+          
+          if (openingStock.is_locked === 1) {
+            toast.warning('Opening stock is locked. Only item details updated.');
+          } else {
+            // Calculate the difference between old and new stock
+            const oldQty = existingItem.current_stock || 0;
+            const newQty = payload.current_stock || 0;
+            const qtyDifference = newQty - oldQty;
 
-        toast.success('Product updated successfully');
+            // Calculate the new opening stock quantity
+            const currentOpeningQty = openingStock.opening_qty || 0;
+            const updatedOpeningQty = currentOpeningQty + qtyDifference;
+
+            if (updatedOpeningQty >= 0) {
+              await window.electronAPI.setOpeningStock({
+                itemId: editingItem,
+                qty: updatedOpeningQty,
+                rate: payload.purchase_rate,
+                date: openingStock.opening_date || new Date().toISOString().split('T')[0]
+              });
+              toast.success('Product and opening stock updated');
+            } else {
+              toast.warning('Opening stock cannot be negative. Only item details updated.');
+            }
+          }
+        } catch (stockError) {
+          console.error('Error updating opening stock:', stockError);
+          toast.warning('Product updated but opening stock update failed');
+        }
+
         await loadAllData();
       }
       setEditingItem(null);
@@ -1114,7 +1150,7 @@ const buildProductPayload = (form) => ({
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200"> 
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>

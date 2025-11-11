@@ -1,0 +1,363 @@
+import React, { useState, useEffect } from 'react';
+import { X, AlertCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
+import PartyComboBox from './PartyComboBox';
+
+function TransactionModal({ isOpen, onClose, onSuccess, editData = null }) {
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const [transactionForm, setTransactionForm] = useState({
+    voucher_type: 'Payment',
+    transaction_date: new Date().toISOString().split('T')[0],
+    bank_account_id: '',
+    party_name: '',
+    amount: '',
+    cheque_number: '',
+    cheque_date: '',
+    narration: '',
+    is_pdc: false,
+    to_account_id: ''
+  });
+
+  useEffect(() => {
+    if (isOpen) {
+      loadInitialData();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (editData) {
+      setTransactionForm({
+        ...editData,
+        transaction_date: editData.transaction_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+        cheque_date: editData.cheque_date?.split('T')[0] || '',
+      });
+    }
+  }, [editData]);
+
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      const accountsData = await window.electronAPI.getBankAccounts();
+      setBankAccounts(accountsData || []);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      toast.error('Failed to load form data');
+      setBankAccounts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!transactionForm.bank_account_id) {
+      newErrors.bank_account_id = 'Please select a bank account';
+    }
+
+    if (!transactionForm.amount || parseFloat(transactionForm.amount) <= 0) {
+      newErrors.amount = 'Amount must be greater than 0';
+    }
+
+    if (transactionForm.voucher_type === 'Contra') {
+      if (!transactionForm.to_account_id) {
+        newErrors.to_account_id = 'Please select destination account';
+      }
+      
+      if (transactionForm.bank_account_id === transactionForm.to_account_id) {
+        newErrors.to_account_id = 'Source and destination accounts cannot be the same';
+      }
+    }
+
+    if (transactionForm.voucher_type !== 'Contra' && !transactionForm.party_name?.trim()) {
+      newErrors.party_name = 'Please enter To';
+    }
+
+    if (transactionForm.cheque_number && !transactionForm.cheque_date) {
+      newErrors.cheque_date = 'Cheque date is required when cheque number is provided';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Please fill all required fields correctly');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const voucherNumber = await window.electronAPI.generateVoucherNumber(transactionForm.voucher_type);
+      
+      const result = await window.electronAPI.saveBankTransaction({
+        ...transactionForm,
+        amount: parseFloat(transactionForm.amount),
+        voucher_number: voucherNumber,
+        created_by: 'admin'
+      });
+      
+      if (result.success) {
+        const transactionTypeText = 
+          transactionForm.voucher_type === 'Payment' ? 'Payment' :
+          transactionForm.voucher_type === 'Receipt' ? 'Receipt' :
+          'Bank Transfer';
+        toast.success(`${transactionTypeText} saved successfully!`);
+        onSuccess();
+        handleClose();
+      }
+    } catch (error) {
+      console.error('Error saving transaction:', error);
+      toast.error(error.message || 'Failed to save transaction');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClose = () => {
+    setTransactionForm({
+      voucher_type: 'Payment',
+      transaction_date: new Date().toISOString().split('T')[0],
+      bank_account_id: '',
+      party_name: '',
+      amount: '',
+      cheque_number: '',
+      cheque_date: '',
+      narration: '',
+      is_pdc: false,
+      to_account_id: ''
+    });
+    setErrors({});
+    onClose();
+  };
+
+  const handleVoucherTypeChange = (type) => {
+    setTransactionForm({
+      ...transactionForm,
+      voucher_type: type,
+      category_type: type === 'Payment' ? 'Expense' : 'Income',
+      party_name: '',
+      to_account_id: ''
+    });
+    setErrors({});
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h3 className="text-xl font-semibold text-gray-900">
+            {editData ? 'Edit Transaction' : 'New Banking Entry'}
+          </h3>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-600"
+            disabled={saving}
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        {loading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading form data...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="p-6">
+            {/* Voucher Type Selection */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Transaction Type <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'Payment', label: 'Payment', color: 'red' },
+                  { value: 'Receipt', label: 'Receipt', color: 'green' },
+                  { value: 'Contra', label: 'Contra', color: 'blue' }
+                ].map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => handleVoucherTypeChange(type.value)}
+                    className={`p-3 rounded-lg border-2 font-medium transition-all ${
+                      transactionForm.voucher_type === type.value
+                        ? `border-${type.color}-500 bg-${type.color}-50 text-${type.color}-700`
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={transactionForm.transaction_date}
+                  onChange={(e) => setTransactionForm({ ...transactionForm, transaction_date: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              {/* Bank Account */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {transactionForm.voucher_type === 'Contra' ? 'From Account' : 'Bank Account'} <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={transactionForm.bank_account_id}
+                  onChange={(e) => setTransactionForm({ ...transactionForm, bank_account_id: e.target.value })}
+                  className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
+                    errors.bank_account_id ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  required
+                >
+                  <option value="">Select Account</option>
+                  {bankAccounts?.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name} - {acc.bank_name} (₹{acc.current_balance?.toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+                {errors.bank_account_id && (
+                  <p className="text-red-500 text-xs mt-1">{errors.bank_account_id}</p>
+                )}
+              </div>
+
+              {/* For Contra - To Account */}
+              {transactionForm.voucher_type === 'Contra' && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    To Account <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={transactionForm.to_account_id}
+                    onChange={(e) => setTransactionForm({ ...transactionForm, to_account_id: e.target.value })}
+                    className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
+                      errors.to_account_id ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Destination Account</option>
+                    {bankAccounts
+                      ?.filter(acc => acc.id !== parseInt(transactionForm.bank_account_id))
+                      .map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.account_name} - {acc.bank_name} (₹{acc.current_balance?.toFixed(2)})
+                        </option>
+                      ))}
+                  </select>
+                  {errors.to_account_id && (
+                    <p className="text-red-500 text-xs mt-1">{errors.to_account_id}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Party Name - Not for Contra - UPDATED WITH COMBOBOX */}
+              {transactionForm.voucher_type !== 'Contra' && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    To <span className="text-red-500">*</span>
+                  </label>
+                  <PartyComboBox
+                    value={transactionForm.party_name}
+                    onChange={(value) => setTransactionForm({ ...transactionForm, party_name: value })}
+                    voucherType={transactionForm.voucher_type}
+                    disabled={saving}
+                    error={errors.party_name}
+                  />
+                </div>
+              )}
+
+              {/* Amount */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Amount <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={transactionForm.amount}
+                  onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
+                  className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 ${
+                    errors.amount ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="0.00"
+                  required
+                />
+                {errors.amount && (
+                  <p className="text-red-500 text-xs mt-1">{errors.amount}</p>
+                )}
+              </div>
+
+             
+             
+              
+              {/* Narration */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Narration</label>
+                <textarea
+                  value={transactionForm.narration}
+                  onChange={(e) => setTransactionForm({ ...transactionForm, narration: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  rows="3"
+                  placeholder="Enter transaction details..."
+                />
+              </div>
+            </div>
+
+            {/* Info Box */}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">Transaction Type Guide:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>Payment:</strong> Money going out (expenses, vendor payments)</li>
+                  <li><strong>Receipt:</strong> Money coming in (sales, customer payments)</li>
+                  <li><strong>Contra:</strong> Transfer between bank accounts</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300" 
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Transaction'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default TransactionModal;

@@ -444,7 +444,7 @@ const Billing = () => {
         <div className="mt-4 sm:mt-0 bg-blue-50 px-4 py-2 rounded-lg">
           <span className="text-sm font-medium text-blue-800">Bill No: {billNumber}</span>
         </div>
-      </div>
+      </div> 
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Items List */}

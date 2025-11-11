@@ -267,7 +267,19 @@ CREATE TABLE IF NOT EXISTS sale_item_cost_allocation (
   FOREIGN KEY (sale_item_id) REFERENCES sale_items (id),
   FOREIGN KEY (purchase_item_id) REFERENCES purchase_items (id)
 );
- 
+
+ CREATE TABLE IF NOT EXISTS opening_stock (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    financial_year TEXT NOT NULL,
+    opening_qty REAL NOT NULL,
+    opening_rate REAL NOT NULL,
+    opening_amount REAL NOT NULL,
+    opening_date DATE NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items (id),
+    UNIQUE(item_id, financial_year)
+  );
 
   `);
 
@@ -278,6 +290,174 @@ CREATE TABLE IF NOT EXISTS sale_item_cost_allocation (
 
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('last_backup', new Date().toISOString());
   db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('bill_counter', '0');
+// Add to your database initialization:
+db.exec(`
+  -- Bank Accounts Master
+  CREATE TABLE IF NOT EXISTS bank_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_name TEXT NOT NULL ,
+    account_number TEXT NOT NULL,
+    bank_name TEXT NOT NULL,
+    branch_name TEXT,
+    ifsc_code TEXT,
+    account_type TEXT CHECK(account_type IN ('Savings', 'Current', 'Cash Credit', 'Overdraft')) DEFAULT 'Current',
+    opening_balance REAL DEFAULT 0,
+   -- opening_balance_type TEXT CHECK(opening_balance_type IN ('Debit', 'Credit')) DEFAULT 'Debit',
+    current_balance REAL DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status_code INTEGER DEFAULT 0
+  );
+
+  -- Bank Transactions
+
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  voucher_number TEXT NOT NULL ,
+  voucher_type TEXT NOT NULL CHECK(voucher_type IN ('Payment', 'Receipt', 'Contra')),
+  transaction_date TEXT NOT NULL,
+  bank_account_id INTEGER NOT NULL,
+  party_name TEXT,
+  amount REAL NOT NULL,
+  transaction_type TEXT NOT NULL CHECK(transaction_type IN ('Debit', 'Credit')),
+  cheque_number TEXT,
+  cheque_date TEXT,
+  narration TEXT,
+  cleared_status TEXT DEFAULT 'Pending' CHECK(cleared_status IN ('Pending', 'Deposited', 'Cleared', 'Bounced', 'Cancelled')),
+  cleared_date TEXT,
+  reconciled INTEGER DEFAULT 0,
+  reconciled_date TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  status_code INTEGER DEFAULT 0,
+  FOREIGN KEY (bank_account_id) REFERENCES bank_accounts(id)
+);
+
+
+  -- Bank Transaction Ledger Entries (for double entry)
+  CREATE TABLE IF NOT EXISTS bank_ledger_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL,
+    ledger_type TEXT CHECK(ledger_type IN ('Bank', 'Party', 'Expense', 'Income')) NOT NULL,
+    ledger_name TEXT NOT NULL,
+    debit_amount REAL DEFAULT 0,
+    credit_amount REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES bank_transactions (id) ON DELETE CASCADE
+  );
+
+  -- Bank Reconciliation
+  CREATE TABLE IF NOT EXISTS bank_reconciliation (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_account_id INTEGER NOT NULL,
+    statement_date DATE NOT NULL,
+    statement_balance REAL NOT NULL,
+    book_balance REAL NOT NULL,
+    difference REAL NOT NULL,
+    reconciled_by TEXT,
+    reconciled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (bank_account_id) REFERENCES bank_accounts (id)
+  );
+
+  -- Expense/Income Categories
+  CREATE TABLE IF NOT EXISTS transaction_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_name TEXT NOT NULL ,
+    category_type TEXT CHECK(category_type IN ('Expense', 'Income')) NOT NULL,
+    description TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Replace the post_dated_cheques table creation with this updated version:
+  CREATE TABLE IF NOT EXISTS post_dated_cheques (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL,
+    cheque_number TEXT NOT NULL,
+    cheque_date DATE NOT NULL,
+    amount REAL NOT NULL,
+    party_name TEXT NOT NULL,
+    bank_name TEXT,
+    status TEXT CHECK(status IN ('Pending', 'Deposited', 'Cleared', 'Bounced', 'Cancelled')) DEFAULT 'Pending',
+    deposit_date DATE,
+    cleared_date DATE,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transaction_id) REFERENCES bank_transactions (id)
+  );
+
+  -- Create indexes for better performance
+  CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(transaction_date);
+  CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(bank_account_id);
+  CREATE INDEX IF NOT EXISTS idx_bank_transactions_voucher ON bank_transactions(voucher_number);
+  CREATE INDEX IF NOT EXISTS idx_pdc_status ON post_dated_cheques(status);
+  CREATE INDEX IF NOT EXISTS idx_pdc_date ON post_dated_cheques(cheque_date);
+`);
+
+// Insert default categories
+db.exec(`
+  INSERT OR IGNORE INTO transaction_categories (category_name, category_type, description) VALUES
+  ('Salary', 'Expense', 'Employee salaries and wages'),
+  ('Rent', 'Expense', 'Office/Shop rent'),
+  ('Utilities', 'Expense', 'Electricity, Water, Internet'),
+  ('Office Supplies', 'Expense', 'Stationery and supplies'),
+  ('Transport', 'Expense', 'Vehicle and fuel expenses'),
+  ('Professional Fees', 'Expense', 'CA, Legal, Consulting fees'),
+  ('Bank Charges', 'Expense', 'Bank fees and charges'),
+  ('Interest Paid', 'Expense', 'Loan interest payments'),
+  ('Taxes', 'Expense', 'GST, Income Tax payments'),
+  ('Miscellaneous', 'Expense', 'Other expenses'),
+  ('Sales Revenue', 'Income', 'Revenue from sales'),
+  ('Interest Received', 'Income', 'Interest from deposits'),
+  ('Other Income', 'Income', 'Miscellaneous income');
+`);
+//opening stock 
+db.exec(`
+   -- Enhanced opening stock table (already exists, but ensure it has all needed columns)
+  CREATE TABLE IF NOT EXISTS opening_stock (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id INTEGER NOT NULL,
+    financial_year TEXT NOT NULL,
+    opening_qty REAL NOT NULL,
+    opening_rate REAL NOT NULL,
+    opening_amount REAL NOT NULL,
+    opening_date DATE NOT NULL,
+    is_locked INTEGER DEFAULT 0,  -- NEW: Prevent tampering
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (item_id) REFERENCES items (id),
+    UNIQUE(item_id, financial_year)
+  );
+
+  -- Create index for faster queries
+  CREATE INDEX IF NOT EXISTS idx_opening_stock_item_fy 
+  ON opening_stock(item_id, financial_year);
+`);
+
+const defaultCashAccount = db.prepare('SELECT * FROM bank_accounts WHERE account_name = ?').get('Cash');
+if (!defaultCashAccount) {
+  db.prepare(`
+    INSERT INTO bank_accounts 
+    (account_name, account_number, bank_name, branch_name, ifsc_code, account_type, opening_balance, current_balance, is_active) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'Cash',           // account_name
+    'CASH-001',       // account_number
+    'Cash in Hand',   // bank_name
+    'N/A',           // branch_name
+    'N/A',           // ifsc_code
+    'Current',       // account_type
+    0,               // opening_balance
+    0,               // current_balance
+    1                // is_active
+  );
+}
+
+
 
   return db;
 }

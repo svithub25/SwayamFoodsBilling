@@ -9,11 +9,13 @@ import { registerTransactionHandlers, registerAnalyticsHandlers } from './report
 import { registerCustomerHandlers } from './customers.js';
 import { registerSalesmanHandlers } from './salesmen.js';
 import { registerPaymentHandlers } from './payments.js';
+import { registerBankingHandlers } from './banking.js';
+import { registerFinancialReportsHandlers } from './financialreports.js';
 import { registerExportHandlers } from './exports.js';
 import { registerBillMessageHandlers } from './messages.js';
 import { registerPrintingHandler } from './printing.js';
 import { registerAppInfoHandler } from './appInfo.js';
-import { registerClosingStockHandlers, createClosingStockReducer } from './closingStock.js';
+import { registerOpeningStockHandlers} from './openingstock.js';
 
 export function registerAllHandlers(context) {
   const {
@@ -38,11 +40,14 @@ export function registerAllHandlers(context) {
   registerCustomerHandlers({ ipcMain, getDb });
   registerSalesmanHandlers({ ipcMain, getDb });
 
-  const reduceClosingStock = createClosingStockReducer(getDb);
-  registerClosingStockHandlers({ ipcMain, getDb });
+  // const reduceClosingStock = createClosingStockReducer(getDb);
+  // registerClosingStockHandlers({ ipcMain, getDb });
+  registerOpeningStockHandlers({ ipcMain, getDb });
 
   registerPurchaseHandlers({ ipcMain, getDb });
-  registerSalesHandlers({ ipcMain, getDb, reduceClosingStock });
+  registerBankingHandlers({ ipcMain, getDb });
+  registerSalesHandlers({ ipcMain, getDb });
+  registerFinancialReportsHandlers(context);
   registerPaymentHandlers({ ipcMain, getDb });
 
   registerTransactionHandlers({ ipcMain, getDb });

@@ -481,4 +481,4 @@ const filteredCommissions = commissions.filter(sale => {
   );
 };
 
-export default SalesmanCommission;
+export default SalesmanCommission; 

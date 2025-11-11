@@ -52,7 +52,8 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
           const existingAllocations = db.prepare(`
             SELECT 
               sica.cost_amount,
-              sica.quantity_allocated
+              sica.quantity_allocated,
+              sica.purchase_item_id
             FROM sale_item_cost_allocation sica
             WHERE sica.sale_item_id = ?
           `).all(saleItem.id);
@@ -60,16 +61,30 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
           let itemCost = 0;
 
           if (existingAllocations && existingAllocations.length > 0) {
-            // Use existing allocations
+            // Use existing allocations (includes -1 for opening, -2 for current rate, -3 for estimated)
             itemCost = existingAllocations.reduce((sum, alloc) => sum + (alloc.cost_amount || 0), 0);
             console.log(`Using existing cost allocation for sale_item ${saleItem.id}: ₹${itemCost}`);
           } else {
             // Need to allocate cost using FIFO
             let remainingQty = saleItem.quantity;
 
-            // Get purchase history for this item using FIFO
+            // Get OPENING STOCK + PURCHASES for FIFO
             const purchases = db.prepare(`
               SELECT
+                'opening' as source,
+                -1 as purchase_item_id,
+                os.opening_qty as available_qty,
+                os.opening_rate as purchase_rate,
+                os.opening_date as purchase_date,
+                'Opening Stock' as invoice_number
+              FROM opening_stock os
+              WHERE os.item_id = ?
+              AND os.opening_date <= ?
+              
+              UNION ALL
+              
+              SELECT
+                'purchase' as source,
                 pi.id as purchase_item_id,
                 pi.quantity as available_qty,
                 pi.unit_price as purchase_rate,
@@ -81,29 +96,48 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
               AND p.purchase_date <= ?
               AND (pi.status_code = 0 OR pi.status_code IS NULL)
               AND (p.status_code = 0 OR p.status_code IS NULL)
-              ORDER BY p.purchase_date ASC, p.id ASC
-            `).all(saleItem.item_id, sale.sale_date);
+              
+              ORDER BY purchase_date ASC, purchase_item_id ASC
+            `).all(saleItem.item_id, sale.sale_date, saleItem.item_id, sale.sale_date);
 
-            // Calculate how much of each purchase has already been allocated (BEFORE this sale)
+            // Calculate usage (skip opening stock in usage calculation since it's always first)
             const purchaseUsage = new Map();
             for (const purchase of purchases) {
-              const usedQty = db.prepare(`
-                SELECT COALESCE(SUM(quantity_allocated), 0) as used
-                FROM sale_item_cost_allocation sica
-                JOIN sale_items si ON sica.sale_item_id = si.id
-                JOIN sales s ON si.sale_id = s.id
-                WHERE sica.purchase_item_id = ?
-                AND s.sale_date <= ?
-                AND si.id != ?
-              `).get(purchase.purchase_item_id, sale.sale_date, saleItem.id);
-              
-              purchaseUsage.set(purchase.purchase_item_id, {
-                ...purchase,
-                remaining: purchase.available_qty - (usedQty?.used || 0)
-              });
+              if (purchase.source === 'opening') {
+                // For opening stock, check how much has been used
+                const usedQty = db.prepare(`
+                  SELECT COALESCE(SUM(quantity_allocated), 0) as used
+                  FROM sale_item_cost_allocation sica
+                  JOIN sale_items si ON sica.sale_item_id = si.id
+                  JOIN sales s ON si.sale_id = s.id
+                  WHERE sica.purchase_item_id = -1
+                  AND si.item_id = ?
+                  AND s.sale_date < ?
+                `).get(saleItem.item_id, sale.sale_date);
+                
+                purchaseUsage.set(-1, {
+                  ...purchase,
+                  remaining: purchase.available_qty - (usedQty?.used || 0)
+                });
+              } else {
+                const usedQty = db.prepare(`
+                  SELECT COALESCE(SUM(quantity_allocated), 0) as used
+                  FROM sale_item_cost_allocation sica
+                  JOIN sale_items si ON sica.sale_item_id = si.id
+                  JOIN sales s ON si.sale_id = s.id
+                  WHERE sica.purchase_item_id = ?
+                  AND s.sale_date <= ?
+                  AND si.id != ?
+                `).get(purchase.purchase_item_id, sale.sale_date, saleItem.id);
+                
+                purchaseUsage.set(purchase.purchase_item_id, {
+                  ...purchase,
+                  remaining: purchase.available_qty - (usedQty?.used || 0)
+                });
+              }
             }
 
-            // Allocate cost using FIFO
+            // Allocate using FIFO (opening stock will be used first)
             const allocationsToInsert = [];
             for (const purchase of purchases) {
               if (remainingQty <= 0) break;
@@ -117,10 +151,9 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
               itemCost += costForThisQty;
               remainingQty -= qtyToUse;
 
-              // Store allocation to insert later
               allocationsToInsert.push({
                 sale_item_id: saleItem.id,
-                purchase_item_id: purchase.purchase_item_id,
+                purchase_item_id: purchase.purchase_item_id, // -1 for opening stock
                 quantity_allocated: qtyToUse,
                 purchase_rate: purchase.purchase_rate,
                 cost_amount: costForThisQty
@@ -151,12 +184,12 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
               const currentItem = db.prepare('SELECT purchase_rate FROM items WHERE id = ?').get(saleItem.item_id);
               if (currentItem && currentItem.purchase_rate > 0) {
                 itemCost += remainingQty * currentItem.purchase_rate;
-                console.log(`Using current purchase_rate for remaining ${remainingQty} units: ₹${currentItem.purchase_rate}`);
+              
               } else {
                 // Use 70% of base sale price as estimated cost
                 const basePrice = saleItem.unit_price;
                 itemCost += remainingQty * (basePrice * 0.7);
-                console.log(`Using estimated cost (70% of sale price) for remaining ${remainingQty} units`);
+               
               }
             }
           }
@@ -296,13 +329,21 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
         const allocations = db.prepare(`
           SELECT 
             sica.*,
-            pi.unit_price,
-            p.invoice_number,
-            p.purchase_date
+            CASE 
+              WHEN sica.purchase_item_id = -1 THEN 'Opening Stock'
+              WHEN sica.purchase_item_id = -2 THEN 'Current Purchase Rate'
+              WHEN sica.purchase_item_id = -3 THEN 'Estimated (70% of Sale)'
+              ELSE p.invoice_number
+            END as invoice_number,
+            CASE 
+              WHEN sica.purchase_item_id > 0 THEN p.purchase_date
+              ELSE NULL
+            END as purchase_date
           FROM sale_item_cost_allocation sica
-          JOIN purchase_items pi ON sica.purchase_item_id = pi.id
-          JOIN purchases p ON pi.purchase_id = p.id
+          LEFT JOIN purchase_items pi ON sica.purchase_item_id = pi.id AND sica.purchase_item_id > 0
+          LEFT JOIN purchases p ON pi.purchase_id = p.id
           WHERE sica.sale_item_id = ?
+          ORDER BY sica.id
         `).all(item.id);
 
         const totalCost = allocations.reduce((sum, a) => sum + (a.cost_amount || 0), 0);
@@ -314,7 +355,7 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
           ...item,
           cost: totalCost,
           profit: itemProfit,
-          total_amount: item.total_price, // For compatibility with frontend
+          total_amount: item.total_price,
           allocations
         };
       });

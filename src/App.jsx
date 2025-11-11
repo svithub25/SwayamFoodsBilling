@@ -19,7 +19,7 @@ import Ledger from "./components/Ledger";
 import Export from "./components/Export"; 
 import Backup from "./components/Backup";
 import ComingSoon from "./components/ComingSoon";
-import Banking from "./components/Banking";
+import Banking from "./components/Banking/index";
 import Analytics from "./components/Analytics"; 
 import Admin from "./components/Admin";
 import ItemDetails from "./components/ItemDetails";
@@ -31,6 +31,7 @@ import ShortcutHelp from "./components/ShortcutHelp";
 import PurchaseEdit from "./components/PurchaseEdit";
 import SaleEdit from "./components/SaleEdit"; 
 import Contactus from "./components/Contactus"; 
+import OpeningStockManagement from "./components/Openingstock/OpeningStockManagement"
 import SalesmanCommission from "./components/SalesmanCommission";
 
 
@@ -109,6 +110,7 @@ const App = () => {
                 <Route path="/backup" element={<Backup />} />  
                 <Route path="/analytics" element={<Analytics />} />  
                  <Route path="/banking" element={<Banking />} /> 
+                 <Route path="/openingstock" element={<OpeningStockManagement />} /> 
                 <Route path="/admin" element={<Admin />} /> 
                 <Route path="/item/:id" element={<ItemDetails />} />
                 <Route path="/purchase/:id" element={<PurchaseDetails />} />

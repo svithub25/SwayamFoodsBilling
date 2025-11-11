@@ -1,5 +1,5 @@
 {
-  "name": "billing-software",
+  "name": "SV's-BizzSaathi",
   "private": true,
   "version": "1.1.0",
   "type": "module",
@@ -10,14 +10,10 @@
   "company": "S V IT HUB",
   "license": "Proprietary",
   "copyright": "© 2025 S V IT HUB",
-  "homepageUrl": "https://mybillingapp.com",
+  "homepageUrl": "https://SVs-BizzSaathi.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/InfernoTJ/BillingSoftware"
-  },
-  "support": {
-    "email": "support@mybillingapp.com",
-    "phone": "+91-9876543210"
   },
   "releaseDate": "2025-09-26",
   "scripts": {
@@ -69,8 +65,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.billing.software",
-    "productName": "Billing Software",
+    "appId": "com.svs.bizzsaathi",
+    "productName": "SV's BizzSaathi",
     "icon": "electron/favicon.ico",
     "directories": {
       "output": "dist-electron"
@@ -94,8 +90,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Billing Software",
-      "uninstallDisplayName": "Billing Software",
+      "shortcutName": "SV's BizzSaathi",
+      "uninstallDisplayName": "SV's BizzSaathi",
       "license": "electron/License"
     },
     "extraResources": [

@@ -28,7 +28,7 @@ export function createBackupManager({
 
         const backupFile = path.join(
           backupDir,
-          `billing_software_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`
+          `SVs_BizzSaathi_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`
         );
 
         db.backup(backupFile)
@@ -66,7 +66,7 @@ export function createBackupManager({
     try {
       const result = await dialog.showSaveDialog(getMainWindow(), {
         title: 'Backup Database',
-        defaultPath: `billing_software_backup_${new Date().toISOString().split('T')[0]}.db`,
+        defaultPath: `SVs_BizzSaathi_backup_${new Date().toISOString().split('T')[0]}.db`,
         filters: [{ name: 'Database Files', extensions: ['db'] }]
       });
 

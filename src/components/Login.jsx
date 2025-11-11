@@ -37,7 +37,7 @@ const Login = ({ onLogin }) => {
           <div className="bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-blue-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing Software</h1>
+          <h1 className="text-2xl font-bold text-gray-900">SV's BizzSaathi</h1>
           {/* <h1 className="text-2xl font-bold text-gray-900">Shiva Books & Stationery</h1> */}
           <p className="text-gray-600 mt-2">Please sign in to continue</p>
 

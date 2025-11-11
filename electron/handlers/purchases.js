@@ -24,6 +24,13 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
       const updateItemStmt = db.prepare(
         'UPDATE items SET current_stock = current_stock + ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?'
       );
+      // Only update purchase_rate if this is the latest purchase for this item
+      const updatePurchaseRateStmt = db.prepare(`
+        UPDATE items 
+        SET purchase_rate = ? 
+        WHERE id = ? 
+        AND (last_purchase_date IS NULL OR last_purchase_date <= ?)
+      `);
 
       items.forEach((item) => {
         purchaseItemStmt.run(
@@ -37,7 +44,11 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
           item.total_price,
           item.discount || 0
         );
+        // Update stock and last purchase info
         updateItemStmt.run(item.quantity, supplier_id, purchase_date, item.id);
+        
+        // Only update purchase_rate if this purchase is the latest or newer
+        updatePurchaseRateStmt.run(item.unit_price, item.id, purchase_date);
       });
 
       return { success: true, purchaseId };
@@ -148,7 +159,54 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
     try {
       db.prepare('BEGIN TRANSACTION').run();
 
+      // Get old purchase items
       const oldItems = db.prepare('SELECT * FROM purchase_items WHERE purchase_id = ?').all(purchaseId);
+      const oldPurchaseItemIds = oldItems.map(item => item.id);
+      
+      // Get the purchase date to know which sales to recalculate
+      const purchaseInfo = db.prepare('SELECT purchase_date FROM purchases WHERE id = ?').get(purchaseId);
+      
+      // STEP 1: Delete all cost allocations related to this purchase
+      if (oldPurchaseItemIds.length > 0) {
+        const placeholders = oldPurchaseItemIds.map(() => '?').join(',');
+        db.prepare(`
+          DELETE FROM sale_item_cost_allocation 
+          WHERE purchase_item_id IN (${placeholders})
+        `).run(...oldPurchaseItemIds);
+      }
+
+      // STEP 2: Get all affected item IDs
+      const affectedItemIds = [...new Set([
+        ...oldItems.map(item => item.item_id),
+        ...updatedPurchase.items.map(item => item.id)
+      ])];
+
+      // STEP 3: Get all sales of affected items after this purchase date that need recalculation
+      const salesToRecalculate = new Set();
+      for (const itemId of affectedItemIds) {
+        const sales = db.prepare(`
+          SELECT DISTINCT si.sale_id
+          FROM sale_items si
+          JOIN sales s ON si.sale_id = s.id
+          WHERE si.item_id = ?
+          AND s.sale_date >= ?
+          AND (s.status_code = 0 OR s.status_code IS NULL)
+          AND (si.status_code = 0 OR si.status_code IS NULL)
+        `).all(itemId, purchaseInfo.purchase_date);
+        
+        sales.forEach(sale => salesToRecalculate.add(sale.sale_id));
+      }
+
+      // STEP 4: Delete all cost allocations for sales that need recalculation
+      for (const saleId of salesToRecalculate) {
+        db.prepare(`
+          DELETE FROM sale_item_cost_allocation 
+          WHERE sale_item_id IN (
+            SELECT id FROM sale_items WHERE sale_id = ?
+          )
+        `).run(saleId);
+      }
+
       const oldMap = new Map();
       oldItems.forEach((item) => {
         oldMap.set(item.item_id, item);
@@ -159,13 +217,15 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
         newMap.set(item.id, item);
       });
 
-      // Adjust stock
+      // STEP 5: Adjust stock
       for (const oldItem of oldItems) {
         const newItem = newMap.get(oldItem.item_id);
         if (!newItem) {
+          // Item removed
           db.prepare('UPDATE items SET current_stock = current_stock - ? WHERE id = ?')
             .run(oldItem.quantity, oldItem.item_id);
         } else if (newItem.quantity !== oldItem.quantity) {
+          // Quantity changed
           db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?')
             .run(newItem.quantity - oldItem.quantity, oldItem.item_id);
         }
@@ -173,12 +233,13 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
 
       for (const newItem of updatedPurchase.items) {
         if (!oldMap.has(newItem.id)) {
+          // New item added
           db.prepare('UPDATE items SET current_stock = current_stock + ? WHERE id = ?')
             .run(newItem.quantity, newItem.id);
         }
       }
 
-      // Update purchase header
+      // STEP 6: Update purchase header
       db.prepare(`
         UPDATE purchases SET
           supplier_id = ?,
@@ -202,7 +263,7 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
         purchaseId
       );
 
-      // UPDATE existing items or INSERT new ones
+      // STEP 7: UPDATE existing items or INSERT new ones
       const updateStmt = db.prepare(`
         UPDATE purchase_items SET
           quantity = ?,
@@ -221,11 +282,25 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
+      // Update last_supplier and last_purchase_date
+      const updateLastPurchaseInfoStmt = db.prepare(`
+        UPDATE items 
+        SET last_supplier_id = ?, last_purchase_date = ? 
+        WHERE id = ?
+      `);
+
+      // Only update purchase_rate if this purchase date is >= the item's current last_purchase_date
+      const updatePurchaseRateStmt = db.prepare(`
+        UPDATE items 
+        SET purchase_rate = ? 
+        WHERE id = ? 
+        AND (last_purchase_date IS NULL OR ? >= last_purchase_date)
+      `);
+
       updatedPurchase.items.forEach((item) => {
         const oldItem = oldMap.get(item.id);
         
         if (oldItem) {
-          // Update existing item
           updateStmt.run(
             item.quantity,
             item.unit_price,
@@ -238,7 +313,6 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
             item.id
           );
         } else {
-          // Insert new item
           insertStmt.run(
             purchaseId,
             item.id,
@@ -252,22 +326,33 @@ export function registerPurchaseHandlers({ ipcMain, getDb }) {
           );
         }
         
-        // Update item's last purchase info
-        db.prepare('UPDATE items SET purchase_rate = ?, last_supplier_id = ?, last_purchase_date = ? WHERE id = ?')
-          .run(item.unit_price, updatedPurchase.supplier_id, updatedPurchase.purchase_date, item.id);
+        // Update last purchase info
+        updateLastPurchaseInfoStmt.run(
+          updatedPurchase.supplier_id, 
+          updatedPurchase.purchase_date, 
+          item.id
+        );
+
+        // Only update purchase_rate if this is the latest or equal purchase date
+        updatePurchaseRateStmt.run(
+          item.unit_price, 
+          item.id, 
+          updatedPurchase.purchase_date
+        );
       });
 
-      // Mark removed items as deleted (soft delete) instead of hard delete
+      // STEP 8: Soft delete removed items
       for (const oldItem of oldItems) {
         if (!newMap.has(oldItem.item_id)) {
           db.prepare('UPDATE purchase_items SET status_code = 1 WHERE id = ?').run(oldItem.id);
-          // Also delete associated cost allocations
-          db.prepare('DELETE FROM sale_item_cost_allocation WHERE purchase_item_id = ?').run(oldItem.id);
         }
       }
 
       db.prepare('COMMIT').run();
-      return { success: true };
+      
+      console.log(`Purchase ${purchaseId} updated. Will recalculate ${salesToRecalculate.size} affected sales.`);
+      
+      return { success: true, salesToRecalculate: Array.from(salesToRecalculate) };
       
     } catch (error) {
       try {
