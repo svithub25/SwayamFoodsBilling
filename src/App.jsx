@@ -73,13 +73,13 @@ const App = () => {
   const handleLogin = (userData) => {
     setUser(userData);
     setIsAuthenticated(true);
-    localStorage.setItem("user", JSON.stringify(userData));
+    sessionStorage.setItem("user", JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
     setIsAuthenticated(false);
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
   };
 
   if (loading) {

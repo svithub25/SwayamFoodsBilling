@@ -1,7 +1,17 @@
 export function registerTransactionHandlers({ ipcMain, getDb }) {
+  const costAllocationCache = new Map();
+
   ipcMain.handle('get-transactions', async (event, { startDate, endDate, type }) => {
     const db = getDb();
     const transactions = [];
+    
+    // Initialize summary counters
+    let totalSalesAmount = 0;
+    let totalPurchasesAmount = 0;
+    let totalCost = 0;
+    let totalProfit = 0;
+    let salesCount = 0;
+    let purchasesCount = 0;
 
     if (type === 'all' || type === 'sales') {
       const sales = db.prepare(`
@@ -18,13 +28,18 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
         FROM sales s
         WHERE s.sale_date BETWEEN ? AND ?
         AND (s.status_code = 0 OR s.status_code IS NULL)
-        ORDER BY s.sale_date ASC
+        ORDER BY s.sale_date DESC
       `).all(startDate, endDate);
 
-      for (const sale of sales) {
-        const saleItems = db.prepare(`
+      const allSaleIds = sales.map(s => s.id);
+      const saleItemsMap = new Map();
+      
+      if (allSaleIds.length > 0) {
+        const placeholders = allSaleIds.map(() => '?').join(',');
+        const allSaleItems = db.prepare(`
           SELECT
             si.id,
+            si.sale_id,
             si.item_id,
             si.quantity,
             si.unit_price,
@@ -32,210 +47,88 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
             si.cgst_amount,
             si.sgst_amount,
             si.total_price,
-            i.name as item_name
+            i.name as item_name,
+            i.purchase_rate
           FROM sale_items si
           LEFT JOIN items i ON si.item_id = i.id
-          WHERE si.sale_id = ?
+          WHERE si.sale_id IN (${placeholders})
           AND (si.status_code = 0 OR si.status_code IS NULL)
-        `).all(sale.id);
+        `).all(...allSaleIds);
 
-        let totalCost = 0;
-        let totalRevenue = 0;
-        const itemBreakdown = [];
+        allSaleItems.forEach(item => {
+          if (!saleItemsMap.has(item.sale_id)) {
+            saleItemsMap.set(item.sale_id, []);
+          }
+          saleItemsMap.get(item.sale_id).push(item);
+        });
+      }
+
+      const existingAllocations = new Map();
+      if (allSaleIds.length > 0) {
+        const placeholders = allSaleIds.map(() => '?').join(',');
+        const allocations = db.prepare(`
+          SELECT 
+            sica.sale_item_id,
+            SUM(sica.cost_amount) as total_cost
+          FROM sale_item_cost_allocation sica
+          JOIN sale_items si ON sica.sale_item_id = si.id
+          WHERE si.sale_id IN (${placeholders})
+          GROUP BY sica.sale_item_id
+        `).all(...allSaleIds);
+
+        allocations.forEach(alloc => {
+          existingAllocations.set(alloc.sale_item_id, alloc.total_cost);
+        });
+      }
+
+      for (const sale of sales) {
+        const saleItems = saleItemsMap.get(sale.id) || [];
+        let saleTotalCost = 0;
+        let saleTotalRevenue = 0;
 
         for (const saleItem of saleItems) {
-          // Revenue is the total_price from sale_items
           const itemRevenue = saleItem.total_price || 0;
-          totalRevenue += itemRevenue;
+          saleTotalRevenue += itemRevenue;
           
-          // First, check if cost allocation already exists for this sale item
-          const existingAllocations = db.prepare(`
-            SELECT 
-              sica.cost_amount,
-              sica.quantity_allocated,
-              sica.purchase_item_id
-            FROM sale_item_cost_allocation sica
-            WHERE sica.sale_item_id = ?
-          `).all(saleItem.id);
+          let itemCost = existingAllocations.get(saleItem.id) || 0;
 
-          let itemCost = 0;
-
-          if (existingAllocations && existingAllocations.length > 0) {
-            // Use existing allocations (includes -1 for opening, -2 for current rate, -3 for estimated)
-            itemCost = existingAllocations.reduce((sum, alloc) => sum + (alloc.cost_amount || 0), 0);
-            // console.log(`Using existing cost allocation for sale_item ${saleItem.id}: ₹${itemCost}`);
-          } else {
-            // Need to allocate cost using FIFO
-            let remainingQty = saleItem.quantity;
-
-            // Get OPENING STOCK + PURCHASES for FIFO
-            const purchases = db.prepare(`
-              SELECT
-                'opening' as source,
-                -1 as purchase_item_id,
-                os.opening_qty as available_qty,
-                os.opening_rate as purchase_rate,
-                os.opening_date as purchase_date,
-                'Opening Stock' as invoice_number
-              FROM opening_stock os
-              WHERE os.item_id = ?
-              AND os.opening_date <= ?
-              
-              UNION ALL
-              
-              SELECT
-                'purchase' as source,
-                pi.id as purchase_item_id,
-                pi.quantity as available_qty,
-                pi.unit_price as purchase_rate,
-                p.purchase_date,
-                p.invoice_number
-              FROM purchase_items pi
-              JOIN purchases p ON pi.purchase_id = p.id
-              WHERE pi.item_id = ?
-              AND p.purchase_date <= ?
-              AND (pi.status_code = 0 OR pi.status_code IS NULL)
-              AND (p.status_code = 0 OR p.status_code IS NULL)
-              
-              ORDER BY purchase_date ASC, purchase_item_id ASC
-            `).all(saleItem.item_id, sale.sale_date, saleItem.item_id, sale.sale_date);
-
-            // Calculate usage (skip opening stock in usage calculation since it's always first)
-            const purchaseUsage = new Map();
-            for (const purchase of purchases) {
-              if (purchase.source === 'opening') {
-                // For opening stock, check how much has been used
-                const usedQty = db.prepare(`
-                  SELECT COALESCE(SUM(quantity_allocated), 0) as used
-                  FROM sale_item_cost_allocation sica
-                  JOIN sale_items si ON sica.sale_item_id = si.id
-                  JOIN sales s ON si.sale_id = s.id
-                  WHERE sica.purchase_item_id = -1
-                  AND si.item_id = ?
-                  AND s.sale_date < ?
-                `).get(saleItem.item_id, sale.sale_date);
-                
-                purchaseUsage.set(-1, {
-                  ...purchase,
-                  remaining: purchase.available_qty - (usedQty?.used || 0)
-                });
-              } else {
-                const usedQty = db.prepare(`
-                  SELECT COALESCE(SUM(quantity_allocated), 0) as used
-                  FROM sale_item_cost_allocation sica
-                  JOIN sale_items si ON sica.sale_item_id = si.id
-                  JOIN sales s ON si.sale_id = s.id
-                  WHERE sica.purchase_item_id = ?
-                  AND s.sale_date <= ?
-                  AND si.id != ?
-                `).get(purchase.purchase_item_id, sale.sale_date, saleItem.id);
-                
-                purchaseUsage.set(purchase.purchase_item_id, {
-                  ...purchase,
-                  remaining: purchase.available_qty - (usedQty?.used || 0)
-                });
-              }
-            }
-
-            // Allocate using FIFO (opening stock will be used first)
-            const allocationsToInsert = [];
-            for (const purchase of purchases) {
-              if (remainingQty <= 0) break;
-              
-              const usage = purchaseUsage.get(purchase.purchase_item_id);
-              if (!usage || usage.remaining <= 0) continue;
-
-              const qtyToUse = Math.min(remainingQty, usage.remaining);
-              const costForThisQty = qtyToUse * purchase.purchase_rate;
-              
-              itemCost += costForThisQty;
-              remainingQty -= qtyToUse;
-
-              allocationsToInsert.push({
-                sale_item_id: saleItem.id,
-                purchase_item_id: purchase.purchase_item_id, // -1 for opening stock
-                quantity_allocated: qtyToUse,
-                purchase_rate: purchase.purchase_rate,
-                cost_amount: costForThisQty
-              });
-            }
-
-            // Insert all allocations for this sale item
-            for (const allocation of allocationsToInsert) {
-              try {
-                db.prepare(`
-                  INSERT INTO sale_item_cost_allocation 
-                  (sale_item_id, purchase_item_id, quantity_allocated, purchase_rate, cost_amount)
-                  VALUES (?, ?, ?, ?, ?)
-                `).run(
-                  allocation.sale_item_id,
-                  allocation.purchase_item_id,
-                  allocation.quantity_allocated,
-                  allocation.purchase_rate,
-                  allocation.cost_amount
-                );
-              } catch (err) {
-                console.log('Cost allocation insert error:', err.message);
-              }
-            }
-
-            // If we still have remaining quantity (no purchase history found)
-            if (remainingQty > 0) {
-              const currentItem = db.prepare('SELECT purchase_rate FROM items WHERE id = ?').get(saleItem.item_id);
-              if (currentItem && currentItem.purchase_rate > 0) {
-                itemCost += remainingQty * currentItem.purchase_rate;
-              
-              } else {
-                // Use 70% of base sale price as estimated cost
-                const basePrice = saleItem.unit_price;
-                itemCost += remainingQty * (basePrice * 0.7);
-               
-              }
+          if (itemCost === 0) {
+            if (saleItem.purchase_rate > 0) {
+              itemCost = saleItem.quantity * saleItem.purchase_rate;
+            } else {
+              itemCost = saleItem.quantity * saleItem.unit_price * 0.7;
             }
           }
 
-          totalCost += itemCost;
-
-          // Calculate item profit (revenue includes GST, so we subtract it)
-          const itemGST = (saleItem.cgst_amount || 0) + (saleItem.sgst_amount || 0);
-          const itemBaseRevenue = itemRevenue - itemGST;
-          const itemProfit = itemBaseRevenue - itemCost;
-          const itemProfitMargin = itemBaseRevenue > 0 ? ((itemProfit / itemBaseRevenue) * 100) : 0;
-
-          itemBreakdown.push({
-            item_name: saleItem.item_name,
-            quantity: saleItem.quantity,
-            sale_price: saleItem.unit_price,
-            sale_total: itemRevenue,
-            cost: itemCost,
-            gst: itemGST,
-            profit: itemProfit,
-            profit_margin: itemProfitMargin.toFixed(2)
-          });
+          saleTotalCost += itemCost;
         }
 
-        // Calculate totals
         const totalGST = (sale.cgst_total || 0) + (sale.sgst_total || 0);
-        const baseRevenue = totalRevenue - totalGST;
-        const grossProfit = baseRevenue - totalCost;
+        const baseRevenue = saleTotalRevenue - totalGST;
+        const grossProfit = baseRevenue - saleTotalCost;
         const profitMargin = baseRevenue > 0 ? ((grossProfit / baseRevenue) * 100).toFixed(2) : 0;
 
         transactions.push({
           type: 'sale',
           ref_number: sale.bill_number,
           date: sale.sale_date,
-          amount: sale.total_amount, // Final bill amount (with GST)
-          revenue: totalRevenue, // Sum of all item totals (with GST)
-          base_revenue: baseRevenue, // Revenue without GST
-          cost: totalCost, // FIFO calculated cost
-          gross_profit: grossProfit, // Base Revenue - Cost
+          amount: sale.total_amount,
+          revenue: saleTotalRevenue,
+          base_revenue: baseRevenue,
+          cost: saleTotalCost,
+          gross_profit: grossProfit,
           profit_margin: profitMargin,
           cgst: sale.cgst_total || 0,
           sgst: sale.sgst_total || 0,
           total_gst: totalGST,
-          description: `Sale - ${sale.customer_name || 'Walk-in Customer'}`,
-          itemBreakdown: itemBreakdown
+          description: `Sale - ${sale.customer_name || 'Walk-in Customer'}`
         });
+
+        // Update summary counters
+        totalSalesAmount += sale.total_amount;
+        totalCost += saleTotalCost;
+        totalProfit += grossProfit;
+        salesCount++;
       }
     }
 
@@ -253,28 +146,10 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
         LEFT JOIN suppliers s ON p.supplier_id = s.id
         WHERE p.purchase_date BETWEEN ? AND ?
         AND (p.status_code = 0 OR p.status_code IS NULL)
+        ORDER BY p.purchase_date DESC
       `).all(startDate, endDate);
 
       for (const purchase of purchases) {
-        const purchaseItems = db.prepare(`
-          SELECT
-            pi.quantity,
-            pi.unit_price,
-            pi.total_price,
-            i.name as item_name
-          FROM purchase_items pi
-          LEFT JOIN items i ON pi.item_id = i.id
-          WHERE pi.purchase_id = ?
-          AND (pi.status_code = 0 OR pi.status_code IS NULL)
-        `).all(purchase.id);
-
-        const itemBreakdown = purchaseItems.map(item => ({
-          item_name: item.item_name,
-          quantity: item.quantity,
-          purchase_rate: item.unit_price,
-          total: item.total_price || (item.quantity * item.unit_price)
-        }));
-
         transactions.push({
           type: 'purchase',
           ref_number: purchase.invoice_number || `PUR-${purchase.id}`,
@@ -288,18 +163,34 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
           cgst: purchase.cgst_total || 0,
           sgst: purchase.sgst_total || 0,
           total_gst: (purchase.cgst_total || 0) + (purchase.sgst_total || 0),
-          description: `Purchase - ${purchase.supplier_name || 'Unknown Supplier'}`,
-          itemBreakdown: itemBreakdown
+          description: `Purchase - ${purchase.supplier_name || 'Unknown Supplier'}`
         });
+
+        // Update summary counters
+        totalPurchasesAmount += purchase.total_amount;
+        purchasesCount++;
       }
     }
 
     // Sort by date descending
     transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    return transactions;
+
+    // Return transactions with pre-calculated summary
+    return {
+      transactions,
+      summary: {
+        totalSales: totalSalesAmount,
+        totalPurchases: totalPurchasesAmount,
+        totalCost: totalCost,
+        totalProfit: totalProfit,
+        salesCount: salesCount,
+        purchasesCount: purchasesCount,
+        averageProfit: salesCount > 0 ? (totalProfit / salesCount) : 0,
+        profitMargin: totalSalesAmount > 0 ? ((totalProfit / totalSalesAmount) * 100).toFixed(2) : 0
+      }
+    };
   });
 
-  // Get detailed breakdown for a transaction
   ipcMain.handle('get-transaction-details', async (event, { type, refNumber }) => {
     const db = getDb();
     
@@ -317,52 +208,61 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
         SELECT 
           si.*,
           i.name,
-          i.unit
+          i.unit,
+          i.purchase_rate,
+          COALESCE((SELECT SUM(cost_amount) FROM sale_item_cost_allocation WHERE sale_item_id = si.id), 0) as allocated_cost
         FROM sale_items si
         LEFT JOIN items i ON si.item_id = i.id
         WHERE si.sale_id = ?
         AND (si.status_code = 0 OR si.status_code IS NULL)
       `).all(sale.id);
 
-      // Get cost allocation details for each item
-      const itemsWithCost = items.map(item => {
-        const allocations = db.prepare(`
-          SELECT 
-            sica.*,
-            CASE 
-              WHEN sica.purchase_item_id = -1 THEN 'Opening Stock'
-              WHEN sica.purchase_item_id = -2 THEN 'Current Purchase Rate'
-              WHEN sica.purchase_item_id = -3 THEN 'Estimated (70% of Sale)'
-              ELSE p.invoice_number
-            END as invoice_number,
-            CASE 
-              WHEN sica.purchase_item_id > 0 THEN p.purchase_date
-              ELSE NULL
-            END as purchase_date
-          FROM sale_item_cost_allocation sica
-          LEFT JOIN purchase_items pi ON sica.purchase_item_id = pi.id AND sica.purchase_item_id > 0
-          LEFT JOIN purchases p ON pi.purchase_id = p.id
-          WHERE sica.sale_item_id = ?
-          ORDER BY sica.id
-        `).all(item.id);
+      let totalCost = 0;
+      let totalProfit = 0;
 
-        const totalCost = allocations.reduce((sum, a) => sum + (a.cost_amount || 0), 0);
+      const itemsWithCost = items.map(item => {
         const itemGST = (item.cgst_amount || 0) + (item.sgst_amount || 0);
         const baseRevenue = (item.total_price || 0) - itemGST;
-        const itemProfit = baseRevenue - totalCost;
+        
+        // Use allocated cost or estimate
+        let itemCost = item.allocated_cost || 0;
+        if (itemCost === 0) {
+          if (item.purchase_rate > 0) {
+            itemCost = item.quantity * item.purchase_rate;
+          } else {
+            itemCost = item.quantity * item.unit_price * 0.7;
+          }
+        }
+
+        const itemProfit = baseRevenue - itemCost;
+        const profitMargin = baseRevenue > 0 ? ((itemProfit / baseRevenue) * 100).toFixed(2) : 0;
+
+        totalCost += itemCost;
+        totalProfit += itemProfit;
 
         return {
           ...item,
-          cost: totalCost,
+          cost: itemCost,
           profit: itemProfit,
-          total_amount: item.total_price,
-          allocations
+          profit_margin: profitMargin,
+          total_amount: item.total_price
         };
       });
 
+      const totalGST = (sale.cgst_total || 0) + (sale.sgst_total || 0);
+      const baseRevenue = sale.total_amount - totalGST;
+      const overallMargin = baseRevenue > 0 ? ((totalProfit / baseRevenue) * 100).toFixed(2) : 0;
+
       return {
         ...sale,
-        items: itemsWithCost
+        items: itemsWithCost,
+        summary: {
+          total_cost: totalCost,
+          total_profit: totalProfit,
+          total_gst: totalGST,
+          base_revenue: baseRevenue,
+          profit_margin: overallMargin
+        }
       };
     }
 
@@ -373,59 +273,31 @@ export function registerTransactionHandlers({ ipcMain, getDb }) {
 export function registerAnalyticsHandlers({ ipcMain, getDb }) {
   ipcMain.handle('get-analytics-data', async (event, { timeFilter } = {}) => {
     try {
-      const safeResult = () => ({
-        overview: { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, growthRate: 0, topCustomer: 'N/A' },
-        topSellingItems: [],
-        salesByCategory: [],
-        salesChart: [],
-        dailyAnalysis: [],
-        weeklyAnalysis: [],
-        monthlyTrends: [],
-        yearlyAnalysis: [],
-        customerAnalysis: []
-      });
-
       const now = new Date();
       const endDate = now.toISOString().slice(0, 10);
       let startDate = '1970-01-01';
 
       switch (timeFilter || 'all') {
-        case 'daily':
-          startDate = endDate;
-          break;
-        case 'weekly':
-          startDate = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-          break;
-        case 'monthly':
-          startDate = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
-          break;
-        case 'quarterly':
-          startDate = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
-          break;
-        case 'yearly':
-          startDate = new Date(now.getTime() - 365 * 86400000).toISOString().slice(0, 10);
-          break;
-        case 'all':
-        default:
-          startDate = '1970-01-01';
+        case 'daily': startDate = endDate; break;
+        case 'weekly': startDate = new Date(now.getTime() - 7 * 86400000).toISOString().slice(0, 10); break;
+        case 'monthly': startDate = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10); break;
+        case 'quarterly': startDate = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10); break;
+        case 'yearly': startDate = new Date(now.getTime() - 365 * 86400000).toISOString().slice(0, 10); break;
+        default: startDate = '1970-01-01';
       }
 
       const db = getDb();
-      const totalSales = db.prepare(`
-        SELECT COALESCE(SUM(total_amount), 0) AS total
+
+      // Pre-calculate everything in SQL
+      const overview = db.prepare(`
+        SELECT 
+          COALESCE(SUM(total_amount), 0) AS totalRevenue,
+          COUNT(*) AS totalOrders,
+          COALESCE(AVG(total_amount), 0) AS avgOrderValue
         FROM sales
         WHERE DATE(sale_date) BETWEEN ? AND ?
         AND (status_code = 0 OR status_code IS NULL)
       `).get(startDate, endDate);
-
-      const totalOrders = db.prepare(`
-        SELECT COUNT(*) AS count
-        FROM sales
-        WHERE DATE(sale_date) BETWEEN ? AND ?
-        AND (status_code = 0 OR status_code IS NULL)
-      `).get(startDate, endDate);
-
-      const avgOrderValue = totalOrders.count > 0 ? totalSales.total / totalOrders.count : 0;
 
       const topCustomer = db.prepare(`
         SELECT
@@ -446,9 +318,10 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
       `).get(startDate, endDate);
 
       const topSellingItems = db.prepare(`
-        SELECT i.name,
-               SUM(si.quantity) AS quantity,
-               SUM(si.total_price) AS revenue
+        SELECT 
+          i.name,
+          SUM(si.quantity) AS quantity,
+          SUM(si.total_price) AS revenue
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         LEFT JOIN items i ON si.item_id = i.id
@@ -461,9 +334,10 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
       `).all(startDate, endDate);
 
       const salesByCategory = db.prepare(`
-        SELECT COALESCE(c.name, 'Uncategorized') AS category,
-               SUM(si.total_price) AS amount,
-               COUNT(DISTINCT i.id) AS items
+        SELECT 
+          COALESCE(c.name, 'Uncategorized') AS category,
+          SUM(si.total_price) AS amount,
+          COUNT(DISTINCT i.id) AS items
         FROM sale_items si
         JOIN sales s ON si.sale_id = s.id
         LEFT JOIN items i ON si.item_id = i.id
@@ -476,9 +350,10 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
       `).all(startDate, endDate);
 
       const salesChart = db.prepare(`
-        SELECT DATE(sale_date) AS date,
-               SUM(total_amount) AS amount,
-               COUNT(*) AS orders
+        SELECT 
+          DATE(sale_date) AS date,
+          SUM(total_amount) AS amount,
+          COUNT(*) AS orders
         FROM sales
         WHERE DATE(sale_date) BETWEEN ? AND ?
         AND (status_code = 0 OR status_code IS NULL)
@@ -489,12 +364,8 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
       const dailyAnalysis = db.prepare(`
         SELECT
           CASE strftime('%w', sale_date)
-            WHEN '0' THEN 'Sunday'
-            WHEN '1' THEN 'Monday'
-            WHEN '2' THEN 'Tuesday'
-            WHEN '3' THEN 'Wednesday'
-            WHEN '4' THEN 'Thursday'
-            WHEN '5' THEN 'Friday'
+            WHEN '0' THEN 'Sunday' WHEN '1' THEN 'Monday' WHEN '2' THEN 'Tuesday'
+            WHEN '3' THEN 'Wednesday' WHEN '4' THEN 'Thursday' WHEN '5' THEN 'Friday'
             WHEN '6' THEN 'Saturday'
           END AS day,
           AVG(total_amount) AS avgSales,
@@ -517,7 +388,7 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
         FROM sales
         WHERE DATE(sale_date) BETWEEN ? AND ?
         AND (status_code = 0 OR status_code IS NULL)
-        GROUP BY strftime('%Y-%W', sale_date)
+        GROUP BY week
         ORDER BY week_start ASC
       `).all(startDate, endDate);
 
@@ -575,42 +446,11 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
         ORDER BY revenue DESC
       `).all(startDate, endDate);
 
-      const inventoryWithCategories = db.prepare(`
-        SELECT i.*, COALESCE(c.name, 'Uncategorized') as category_name
-        FROM items i
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE (i.status_code = 0 OR i.status_code IS NULL)
-      `).all();
-
-      const saleItemsWithCategories = db.prepare(`
-        SELECT si.*, i.name as item_name, i.id as item_id,
-               COALESCE(c.name, 'Uncategorized') as category_name
-        FROM sale_items si
-        JOIN sales s ON si.sale_id = s.id
-        LEFT JOIN items i ON si.item_id = i.id
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE DATE(s.sale_date) BETWEEN ? AND ?
-        AND (s.status_code = 0 OR s.status_code IS NULL)
-        AND (si.status_code = 0 OR si.status_code IS NULL)
-      `).all(startDate, endDate);
-
-      const purchaseItemsWithCategories = db.prepare(`
-        SELECT pi.*, i.name as item_name, i.id as item_id,
-               COALESCE(c.name, 'Uncategorized') as category_name
-        FROM purchase_items pi
-        JOIN purchases p ON pi.purchase_id = p.id
-        LEFT JOIN items i ON pi.item_id = i.id
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE DATE(p.purchase_date) BETWEEN ? AND ?
-        AND (p.status_code = 0 OR p.status_code IS NULL)
-        AND (pi.status_code = 0 OR pi.status_code IS NULL)
-      `).all(startDate, endDate);
-
       return {
         overview: {
-          totalRevenue: totalSales.total,
-          totalOrders: totalOrders.count,
-          avgOrderValue,
+          totalRevenue: overview.totalRevenue || 0,
+          totalOrders: overview.totalOrders || 0,
+          avgOrderValue: overview.avgOrderValue || 0,
           growthRate: 0,
           topCustomer: topCustomer?.customer_name || 'N/A',
           topCustomerContact: topCustomer?.customer_contact || '',
@@ -623,23 +463,14 @@ export function registerAnalyticsHandlers({ ipcMain, getDb }) {
         weeklyAnalysis,
         monthlyTrends,
         yearlyAnalysis,
-        customerAnalysis,
-        inventoryWithCategories,
-        saleItemsWithCategories,
-        purchaseItemsWithCategories
+        customerAnalysis
       };
     } catch (error) {
       console.error('Error getting analytics data:', error);
       return {
         overview: { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0, growthRate: 0, topCustomer: 'N/A' },
-        topSellingItems: [],
-        salesByCategory: [],
-        salesChart: [],
-        dailyAnalysis: [],
-        weeklyAnalysis: [],
-        monthlyTrends: [],
-        yearlyAnalysis: [],
-        customerAnalysis: []
+        topSellingItems: [], salesByCategory: [], salesChart: [], dailyAnalysis: [],
+        weeklyAnalysis: [], monthlyTrends: [], yearlyAnalysis: [], customerAnalysis: []
       };
     }
   });

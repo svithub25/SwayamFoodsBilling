@@ -1,74 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BookOpen, 
-  Filter, 
-  RefreshCw,
-  TrendingUp,
-  TrendingDown,
-  IndianRupee,
-  Eye,
-  Package,
-  ChevronLeft,
-  ChevronRight
+  BookOpen, Filter, RefreshCw, TrendingUp, TrendingDown, IndianRupee, Eye, Package,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 const LedgerData = () => {
-  const [transactions, setTransactions] = useState([]);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [filters, setFilters] = useState({
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: (() => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      const fyStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+      return `${fyStartYear}-04-01`;
+    })(),
     endDate: new Date().toISOString().split('T')[0],
     type: 'all'
   });
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     loadTransactions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const data = await window.electronAPI.getTransactions(filters);
-      console.log('Loaded transactions:', data);
-      setTransactions(data);
+      const response = await window.electronAPI.getTransactions(filters);
+      console.log('Loaded data:', response);
+      setData(response);
       setCurrentPage(1);
     } catch (error) {
       console.error('Error loading transactions:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const getTotalSales = () => {
-    return transactions
-      .filter(t => t.type === 'sale')
-      .reduce((sum, t) => sum + (t.revenue || t.amount), 0);
-  };
-
-  const getTotalPurchases = () => {
-    return transactions
-      .filter(t => t.type === 'purchase')
-      .reduce((sum, t) => sum + t.amount, 0);
-  };
-
-  const getProfit = () => {
-    return transactions
-      .filter(t => t.type === 'sale')
-      .reduce((sum, t) => sum + (t.gross_profit || 0), 0);
-  };
-
-  const getTotalCost = () => {
-    return transactions
-      .filter(t => t.type === 'sale')
-      .reduce((sum, t) => sum + (t.cost || 0), 0);
   };
 
   const viewTransactionDetails = async (transaction) => {
@@ -87,16 +58,24 @@ const LedgerData = () => {
     }
   };
 
-  // Pagination logic
-  useEffect(() => {
-    const total = Math.ceil(transactions.length / itemsPerPage);
-    setTotalPages(total);
-    
-    if (currentPage > total && total > 0) {
-      setCurrentPage(1);
-    }
-  }, [transactions.length, itemsPerPage, currentPage]);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
+  const transactions = data?.transactions || [];
+  const summary = data?.summary || {
+    totalSales: 0,
+    totalPurchases: 0,
+    totalCost: 0,
+    totalProfit: 0
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(transactions.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentTransactions = transactions.slice(indexOfFirstItem, indexOfLastItem);
@@ -106,53 +85,23 @@ const LedgerData = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
-    
     let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-    
     if (endPage - startPage < maxPagesToShow - 1) {
       startPage = Math.max(1, endPage - maxPagesToShow + 1);
     }
-    
     for (let i = startPage; i <= endPage; i++) {
       pages.push(i);
     }
-    
     return pages;
   };
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filters.startDate, filters.endDate, filters.type]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
+      {/* Summary Cards - Using Pre-calculated Data */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow-sm border border-green-200 p-4">
           <div className="flex items-center">
@@ -161,7 +110,7 @@ const LedgerData = () => {
             </div>
             <div className="ml-3">
               <p className="text-xs font-medium text-green-700">Total Sales</p>
-              <p className="text-xl font-bold text-green-900">₹{getTotalSales().toLocaleString('en-IN')}</p>
+              <p className="text-xl font-bold text-green-900">₹{summary.totalSales.toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -173,7 +122,7 @@ const LedgerData = () => {
             </div>
             <div className="ml-3">
               <p className="text-xs font-medium text-red-700">Total Purchases</p>
-              <p className="text-xl font-bold text-red-900">₹{getTotalPurchases().toLocaleString('en-IN')}</p>
+              <p className="text-xl font-bold text-red-900">₹{summary.totalPurchases.toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -185,26 +134,26 @@ const LedgerData = () => {
             </div>
             <div className="ml-3">
               <p className="text-xs font-medium text-orange-700">Total Cost</p>
-              <p className="text-xl font-bold text-orange-900">₹{getTotalCost().toLocaleString('en-IN')}</p>
+              <p className="text-xl font-bold text-orange-900">₹{summary.totalCost.toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
 
         <div className={`bg-gradient-to-br rounded-lg shadow-sm border p-4 ${
-          getProfit() >= 0 
+          summary.totalProfit >= 0 
             ? 'from-blue-50 to-blue-100 border-blue-200' 
             : 'from-red-50 to-red-100 border-red-200'
         }`}>
           <div className="flex items-center">
-            <div className={`p-3 rounded-lg ${getProfit() >= 0 ? 'bg-blue-500' : 'bg-red-500'}`}>
+            <div className={`p-3 rounded-lg ${summary.totalProfit >= 0 ? 'bg-blue-500' : 'bg-red-500'}`}>
               <IndianRupee className="w-5 h-5 text-white" />
             </div>
             <div className="ml-3">
-              <p className={`text-xs font-medium ${getProfit() >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
+              <p className={`text-xs font-medium ${summary.totalProfit >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
                 Gross Profit
               </p>
-              <p className={`text-xl font-bold ${getProfit() >= 0 ? 'text-blue-900' : 'text-red-900'}`}>
-                ₹{getProfit().toLocaleString('en-IN')}
+              <p className={`text-xl font-bold ${summary.totalProfit >= 0 ? 'text-blue-900' : 'text-red-900'}`}>
+                ₹{summary.totalProfit.toLocaleString('en-IN')}
               </p>
             </div>
           </div>
@@ -349,7 +298,7 @@ const LedgerData = () => {
           <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center">
               <button
-                onClick={goToPreviousPage}
+                onClick={() => currentPage > 1 && goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
                 className={`flex items-center px-3 py-2 rounded-lg mr-2 ${
                   currentPage === 1
@@ -364,12 +313,7 @@ const LedgerData = () => {
               <div className="flex gap-1">
                 {currentPage > 3 && (
                   <>
-                    <button
-                      onClick={() => goToPage(1)}
-                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                    >
-                      1
-                    </button>
+                    <button onClick={() => goToPage(1)} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">1</button>
                     {currentPage > 4 && <span className="px-2 py-2">...</span>}
                   </>
                 )}
@@ -379,9 +323,7 @@ const LedgerData = () => {
                     key={pageNum}
                     onClick={() => goToPage(pageNum)}
                     className={`px-3 py-2 rounded-lg ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 hover:bg-gray-200'
+                      currentPage === pageNum ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'
                     }`}
                   >
                     {pageNum}
@@ -391,10 +333,7 @@ const LedgerData = () => {
                 {currentPage < totalPages - 2 && (
                   <>
                     {currentPage < totalPages - 3 && <span className="px-2 py-2">...</span>}
-                    <button
-                      onClick={() => goToPage(totalPages)}
-                      className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                    >
+                    <button onClick={() => goToPage(totalPages)} className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
                       {totalPages}
                     </button>
                   </>
@@ -402,7 +341,7 @@ const LedgerData = () => {
               </div>
               
               <button
-                onClick={goToNextPage}
+                onClick={() => currentPage < totalPages && goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
                 className={`flex items-center px-3 py-2 rounded-lg ml-2 ${
                   currentPage === totalPages
@@ -428,11 +367,10 @@ const LedgerData = () => {
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Transaction Details - {selectedTransaction.bill_number}</h2>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
+                <h2 className="text-xl font-bold text-gray-900">
+                  Transaction Details - {selectedTransaction.bill_number}
+                </h2>
+                <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-gray-600">
                   ✕
                 </button>
               </div>
@@ -450,7 +388,7 @@ const LedgerData = () => {
                 </div>
               </div>
 
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 mb-6">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
@@ -463,30 +401,40 @@ const LedgerData = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {selectedTransaction.items?.map((item, idx) => {
-                    const itemTotal = item.total_amount || item.total_price || 0;
-                    const itemProfit = item.profit || 0;
-                    const profitMargin = itemTotal > 0 ? ((itemProfit / itemTotal) * 100).toFixed(2) : '0.00';
-                    
-                    return (
-                      <tr key={idx}>
-                        <td className="px-4 py-3 text-sm">{item.name}</td>
-                        <td className="px-4 py-3 text-sm text-right">{item.quantity}</td>
-                        <td className="px-4 py-3 text-sm text-right">₹{(item.unit_price || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">₹{itemTotal.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right text-orange-600 font-medium">₹{(item.cost || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">₹{itemProfit.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-right font-medium text-purple-600">{profitMargin}%</td>
-                      </tr>
-                    );
-                  })}
+                  {selectedTransaction.items?.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="px-4 py-3 text-sm">{item.name}</td>
+                      <td className="px-4 py-3 text-sm text-right">{item.quantity}</td>
+                      <td className="px-4 py-3 text-sm text-right">₹{(item.unit_price || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold">₹{(item.total_amount || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-orange-600 font-medium">₹{(item.cost || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">₹{(item.profit || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-right font-medium text-purple-600">{item.profit_margin || '0'}%</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
 
-              <div className="mt-6 flex justify-end space-x-4 text-sm">
-                <div className="text-right">
-                  <p className="text-gray-600">Total Amount</p>
-                  <p className="text-lg font-bold">₹{(selectedTransaction.total_amount || 0).toFixed(2)}</p>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Amount:</span>
+                  <span className="font-bold">₹{(selectedTransaction.total_amount || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Cost:</span>
+                  <span className="font-semibold text-orange-600">₹{(selectedTransaction.summary?.total_cost || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">GST:</span>
+                  <span className="font-medium">₹{(selectedTransaction.summary?.total_gst || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-base pt-2 border-t border-gray-300">
+                  <span className="font-semibold text-gray-900">Total Profit:</span>
+                  <span className="font-bold text-green-600">₹{(selectedTransaction.summary?.total_profit || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Profit Margin:</span>
+                  <span className="font-semibold text-purple-600">{selectedTransaction.summary?.profit_margin || '0'}%</span>
                 </div>
               </div>
             </div>

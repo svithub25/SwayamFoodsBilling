@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { FileText, Download, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react';
+import { FileText, Download, TrendingUp, TrendingDown, Calendar, IndianRupee } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 function BankingReports({ bankAccounts }) {
-  const [activeReport, setActiveReport] = useState('statement');
+  const [activeReport, setActiveReport] = useState('statement'); 
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -400,7 +400,7 @@ function BankingReports({ bankAccounts }) {
                         {reportData.netCashFlow >= 0 ? 'Surplus' : 'Deficit'}
                       </p>
                     </div>
-                    <DollarSign className={`w-12 h-12 ${reportData.netCashFlow >= 0 ? 'text-green-500' : 'text-red-500'}`} />
+                    <IndianRupee className={`w-12 h-12 ${reportData.netCashFlow >= 0 ? 'text-green-500' : 'text-red-500'}`} />
                   </div>
                 </div>
               </div>

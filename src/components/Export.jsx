@@ -317,13 +317,13 @@ const Export = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div className="mb-4">
-            <div className="flex items-center bg-yellow-100 border border-yellow-300 rounded-lg px-4 py-3 mb-2">
+            {/* <div className="flex items-center bg-yellow-100 border border-yellow-300 rounded-lg px-4 py-3 mb-2">
               <AlertTriangle className="w-6 h-6 text-yellow-600 mr-3" />
               <div>
                 <span className="font-semibold text-yellow-800">Still Working On</span>
                 <p className="text-yellow-700 text-sm">This export module is under development. Some features may not be available yet.</p>
               </div>
-            </div>
+            </div> */}
             <h1 className="text-2xl font-bold text-gray-900">Export Data</h1>
             <p className="text-gray-600">Export your data to Excel or PDF formats</p>
           </div>

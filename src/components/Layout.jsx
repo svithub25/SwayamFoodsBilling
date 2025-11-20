@@ -267,15 +267,15 @@ const Layout = ({ children, user, onLogout }) => {
           </div>
         </header>
   
-        {/* Page content */}
-        <main className="p-6 pb-12"> 
+        {/* Page content */} 
+        <main className="p-6 pb-18"> 
           {children}
         </main> 
-        <footer className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 text-center py-2 z-50 shadow-sm">
+        {/* <footer className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 text-center py-2 z-50 shadow-sm">
           <span className="text-sm text-gray-500">
             © {new Date().getFullYear()} S V IT Hub. All rights reserved. | Licensed Professional Services Provider
           </span>
-        </footer>
+        </footer> */}
       </div>
     </div> 
   );

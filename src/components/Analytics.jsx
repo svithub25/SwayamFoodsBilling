@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart3, TrendingUp, Calendar, Package, DollarSign, Users, RefreshCw, 
   ArrowUpRight, ArrowDownRight, Search, X
@@ -42,9 +42,21 @@ const Analytics = () => {
   const [endDate, setEndDate] = useState(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [error, setError] = useState(null);
+  const isInitialMount = useRef(true);
 
+  // Load data on initial mount only
   useEffect(() => {
-    loadAnalyticsData();
+    if (isInitialMount.current) {
+      loadAnalyticsData();
+      isInitialMount.current = false;
+    }
+  }, []); // Empty dependency array - runs once
+
+  // Separate effect to reload when dates change (but not on initial mount)
+  useEffect(() => {
+    if (!isInitialMount.current) {
+      loadAnalyticsData();
+    }
   }, [startDate, endDate]);
 
   const loadAnalyticsData = async () => {
@@ -60,7 +72,7 @@ const Analytics = () => {
       const [sales, purchases, inventory, salesHistory, purchaseHistory] = await Promise.all([
         window.electronAPI.getFilteredSales(dateRange),
         window.electronAPI.getPurchaseHistory(),
-        window.electronAPI.getInventory(), // This already has category_name joined
+        window.electronAPI.getInventory(),
         window.electronAPI.getSalesHistory(),
         window.electronAPI.getPurchaseHistory()
       ]);
@@ -79,7 +91,6 @@ const Analytics = () => {
         const saleDetails = await window.electronAPI.getSaleDetails(sale.id);
         if (saleDetails && saleDetails.items) {
           saleDetails.items.forEach(item => {
-            // Find the inventory item to get category
             const invItem = inventory.find(i => i.id === item.item_id);
             saleItemsDetailed.push({
               ...item,
@@ -98,7 +109,6 @@ const Analytics = () => {
         const purchaseDetails = await window.electronAPI.getPurchaseDetails(purchase.id);
         if (purchaseDetails && purchaseDetails.items) {
           purchaseDetails.items.forEach(item => {
-            // Find the inventory item to get category
             const invItem = inventory.find(i => i.id === item.item_id);
             purchaseItemsDetailed.push({
               ...item,
@@ -229,7 +239,7 @@ const Analytics = () => {
       vendorStats[vendor].total += purchase.total_amount || 0;
     });
 
-    // Customer Analysis (Enhanced)
+    // Customer Analysis
     const customerStats = {};
     sales.forEach(sale => {
       const customer = sale.customer_name || 'Walk-in';
@@ -252,12 +262,10 @@ const Analytics = () => {
       });
     });
 
-    // Calculate customer metrics
     Object.values(customerStats).forEach(customer => {
       customer.avgOrderValue = customer.count > 0 ? customer.total / customer.count : 0;
     });
 
-    // Add items per customer
     saleItems.forEach(item => {
       const customer = item.customer_name || 'Walk-in';
       if (customerStats[customer]) {
@@ -265,10 +273,9 @@ const Analytics = () => {
       }
     });
 
-    // Category Analysis - FIXED
+    // Category Analysis
     const categoryStats = {};
     
-    // Group items by category from inventory (inventory already has category_name from JOIN)
     inventory.forEach(item => {
       const category = item.category_name || 'Uncategorized';
       if (!categoryStats[category]) {
@@ -290,7 +297,6 @@ const Analytics = () => {
       categoryStats[category].items.push(item.name);
     });
 
-    // Add sales data to categories - use category_name from saleItems
     saleItems.forEach(item => {
       const category = item.category_name || 'Uncategorized';
       
@@ -312,7 +318,6 @@ const Analytics = () => {
       categoryStats[category].salesRevenue += item.quantity * item.unit_price;
     });
 
-    // Add purchase data to categories - use category_name from purchaseItems
     purchaseItems.forEach(item => {
       const category = item.category_name || 'Uncategorized';
       
@@ -337,7 +342,6 @@ const Analytics = () => {
     // Daily Trends Analysis
     const dailyData = {};
     
-    // Process sales by date
     sales.forEach(sale => {
       const date = sale.sale_date;
       if (!dailyData[date]) {
@@ -346,7 +350,6 @@ const Analytics = () => {
       dailyData[date].sales += sale.total_amount || 0;
     });
 
-    // Process purchases by date
     purchases.forEach(purchase => {
       const date = purchase.purchase_date;
       if (!dailyData[date]) {
@@ -505,498 +508,500 @@ const Analytics = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading comprehensive analytics...</span>
-      </div>
+      <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-gray-600">Loading comprehensive analytics...</span>
+        </div>
+      </PinProtected>
     );
   }
 
   if (error || !analyticsData) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <BarChart3 className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600">{error || 'No analytics available'}</p>
-          <button
-            onClick={loadAnalyticsData}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <BarChart3 className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600">{error || 'No analytics available'}</p>
+            <button
+              onClick={loadAnalyticsData}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </PinProtected>
     );
   }
 
   const { summary, itemAnalytics, topSellingItems, topPurchasedItems, vendors, customers, categories, dailyTrends, inventory: inventoryData } = analyticsData;
 
   return (
-    <>
     <PinProtected message="This module is protected and requires PIN verification to access." modulename="Analytics">
-    <div className="space-y-6">
-      {/* Header with Date Range */}
-      <div className="flex flex-col sm:flex-row sm:items-center  gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Business Intelligence Dashboard</h1>
-          <p className="text-gray-600">Comprehensive insights and analytics for your business</p>
-        </div>
-        <CustomDateRangePicker />
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-green-600">Total Sales</p>
-              <p className="text-2xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
-              <p className="text-xs text-green-600 mt-1">{summary.totalOrders} orders</p>
-            </div>
-            <DollarSign className="w-12 h-12 text-green-500 opacity-20" />
+      <div className="space-y-6">
+        {/* Header with Date Range */}
+        <div className="flex flex-col sm:flex-row sm:items-center  gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Business Intelligence Dashboard</h1>
+            <p className="text-gray-600">Comprehensive insights and analytics for your business</p>
           </div>
+          <CustomDateRangePicker />
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-600">Items Sold</p>
-              <p className="text-2xl font-bold text-blue-900">{summary.totalItemsSold}</p>
-              <p className="text-xs text-blue-600 mt-1">Total quantity</p>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Total Sales</p>
+                <p className="text-2xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
+                <p className="text-xs text-green-600 mt-1">{summary.totalOrders} orders</p>
+              </div>
+              <DollarSign className="w-12 h-12 text-green-500 opacity-20" />
             </div>
-            <TrendingUp className="w-12 h-12 text-blue-500 opacity-20" />
           </div>
-        </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6 border border-orange-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-orange-600">Items Purchased</p>
-              <p className="text-2xl font-bold text-orange-900">{summary.totalItemsPurchased}</p>
-              <p className="text-xs text-orange-600 mt-1">Total quantity</p>
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Items Sold</p>
+                <p className="text-2xl font-bold text-blue-900">{summary.totalItemsSold}</p>
+                <p className="text-xs text-blue-600 mt-1">Total quantity</p>
+              </div>
+              <TrendingUp className="w-12 h-12 text-blue-500 opacity-20" />
             </div>
-            <Package className="w-12 h-12 text-orange-500 opacity-20" />
           </div>
-        </div>
 
-        {/* <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border border-purple-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-purple-600">Gross Profit</p>
-              <p className="text-2xl font-bold text-purple-900">₹{formatINR(summary.grossProfit)}</p>
-              <p className="text-xs text-purple-600 mt-1">{summary.profitMargin}% margin</p>
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6 border border-orange-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-600">Items Purchased</p>
+                <p className="text-2xl font-bold text-orange-900">{summary.totalItemsPurchased}</p>
+                <p className="text-xs text-orange-600 mt-1">Total quantity</p>
+              </div>
+              <Package className="w-12 h-12 text-orange-500 opacity-20" />
             </div>
-            <ArrowUpRight className="w-12 h-12 text-purple-500 opacity-20" />
           </div>
-        </div> */}
-      </div>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-4 px-6 overflow-x-auto">
-            {[{
-              id: 'overview', name: 'Overview' },
-              { id: 'items', name: 'Item Analysis' },
-              { id: 'customers', name: 'Customer Analysis' },
-              { id: 'categories', name: 'Category Analysis' },
-              { id: 'sales', name: 'Sales Details' },
-              { id: 'purchases', name: 'Purchase Details' }
-            ].map(tab => (
-              <button
-                key={tab.id} 
-                onClick={() => setActiveView(tab.id)}
-                className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
-                  activeView === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
+          {/* <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border border-purple-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600">Gross Profit</p>
+                <p className="text-2xl font-bold text-purple-900">₹{formatINR(summary.grossProfit)}</p>
+                <p className="text-xs text-purple-600 mt-1">{summary.profitMargin}% margin</p>
+              </div>
+              <ArrowUpRight className="w-12 h-12 text-purple-500 opacity-20" />
+            </div>
+          </div> */}
         </div>
 
-        <div className="p-6">
-          {/* Overview */}
-          {activeView === 'overview' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top Selling Items */}
+        {/* Navigation Tabs */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="border-b border-gray-200">
+            <nav className="flex space-x-4 px-6 overflow-x-auto">
+              {[{
+                id: 'overview', name: 'Overview' },
+                { id: 'items', name: 'Item Analysis' },
+                { id: 'customers', name: 'Customer Analysis' },
+                { id: 'categories', name: 'Category Analysis' },
+                { id: 'sales', name: 'Sales Details' },
+                { id: 'purchases', name: 'Purchase Details' }
+              ].map(tab => (
+                <button
+                  key={tab.id} 
+                  onClick={() => setActiveView(tab.id)}
+                  className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap ${
+                    activeView === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {tab.name}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="p-6">
+            {/* Overview */}
+            {activeView === 'overview' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Top Selling Items */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">Top 10 Selling Items by Quantity</h3>
+                    <Bar
+                      data={{
+                        labels: topSellingItems.map(i => i.item_name),
+                        datasets: [{
+                          label: 'Quantity Sold',
+                          data: topSellingItems.map(i => i.total_quantity),
+                          backgroundColor: 'rgba(34, 197, 94, 0.7)'
+                        }]
+                      }}
+                      options={{ 
+                        responsive: true,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } }
+                      }}
+                    />
+                  </div>
+
+                  {/* Top Purchased Items */}
+                  <div className="bg-gray-50 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">Top 10 Purchased Items by Quantity</h3>
+                    <Bar
+                      data={{
+                        labels: topPurchasedItems.map(i => i.item_name),
+                        datasets: [{
+                          label: 'Quantity Purchased',
+                          data: topPurchasedItems.map(i => i.total_quantity),
+                          backgroundColor: 'rgba(239, 68, 68, 0.7)'
+                        }]
+                      }}
+                      options={{ 
+                        responsive: true,
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Daily Trends */}
                 <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Top 10 Selling Items by Quantity</h3>
+                  <h3 className="text-lg font-semibold mb-4">Daily Sales vs Purchase Trend</h3>
+                  <Line
+                    data={{
+                      labels: dailyTrends.map(d => new Date(d.date).toLocaleDateString()),
+                      datasets: [
+                        {
+                          label: 'Sales (₹)',
+                          data: dailyTrends.map(d => d.sales || 0),
+                          borderColor: 'rgb(34, 197, 94)',
+                          backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                          tension: 0.3
+                        },
+                        {
+                          label: 'Purchases (₹)',
+                          data: dailyTrends.map(d => d.purchases || 0),
+                          borderColor: 'rgb(239, 68, 68)',
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                          tension: 0.3
+                        }
+                      ]
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: { legend: { position: 'top' } }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Item Analysis */}
+            {activeView === 'items' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Complete Item-wise Analysis</h2>
+                
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Sold</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Purchased</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
+                          {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gross Profit</th> */}
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {itemAnalytics.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.item_name}</td>
+                            <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{item.total_quantity}</td>
+                            <td className="px-6 py-4 text-sm text-green-600 font-semibold">₹{formatINR(item.total_revenue)}</td>
+                            <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{item.purchased_quantity}</td>
+                            <td className="px-6 py-4 text-sm text-red-600 font-semibold">₹{formatINR(item.purchase_cost)}</td>
+                            {/* <td className="px-6 py-4 text-sm font-bold text-purple-600">₹{formatINR(item.gross_profit)}</td> */}
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="text-xs">
+                                <div>Sales: {item.transactions}</div>
+                                <div>Purchase: {item.purchase_transactions}</div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sales Details */}
+            {activeView === 'sales' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Sales Transaction Details</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                    <p className="text-sm font-medium text-green-600">Total Revenue</p>
+                    <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                    <p className="text-sm font-medium text-blue-600">Total Orders</p>
+                    <p className="text-3xl font-bold text-blue-900">{summary.totalOrders}</p>
+                  </div>
+                  {/* <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                    <p className="text-sm font-medium text-purple-600">Avg Order Value</p>
+                    <p className="text-3xl font-bold text-purple-900">₹{formatINR(summary.avgOrderValue)}</p>
+                  </div> */}
+                </div>
+
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="font-semibold">All Sales Transactions</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bill No</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {analyticsData.sales.map((sale, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-900">{new Date(sale.sale_date).toLocaleDateString()}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{sale.bill_number}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{sale.customer_name || 'Walk-in'}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-green-600">₹{formatINR(sale.total_amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Purchase Details */}
+            {activeView === 'purchases' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Purchase Transaction Details</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-red-50 rounded-lg p-6 border border-red-200">
+                    <p className="text-sm font-medium text-red-600">Total Purchases</p>
+                    <p className="text-3xl font-bold text-red-900">₹{formatINR(summary.totalPurchases)}</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-6 border border-orange-200">
+                    <p className="text-sm font-medium text-orange-600">Purchase Orders</p>
+                    <p className="text-3xl font-bold text-orange-900">{summary.totalPurchaseOrders}</p>
+                  </div>
+                  {/* <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
+                    <p className="text-sm font-medium text-yellow-600">Avg Purchase</p>
+                    <p className="text-3xl font-bold text-yellow-900">₹{formatINR(summary.avgPurchaseValue)}</p>
+                  </div> */}
+                </div>
+
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="font-semibold">All Purchase Transactions</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice No</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {analyticsData.purchases.map((purchase, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm text-gray-900">{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{purchase.invoice_number}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{purchase.supplier_name || 'Unknown'}</td>
+                            <td className="px-6 py-4 text-sm font-semibold text-red-600">₹{formatINR(purchase.total_amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div> 
+                </div>
+              </div>
+            )}
+
+            {/* Customer Analysis */}
+            {activeView === 'customers' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Customer-wise Analysis</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                    <p className="text-sm font-medium text-blue-600">Total Customers</p>
+                    <p className="text-3xl font-bold text-blue-900">{summary.totalCustomers}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                    <p className="text-sm font-medium text-green-600">Total Revenue</p>
+                    <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                    <p className="text-sm font-medium text-purple-600">Avg per Customer</p>
+                    <p className="text-3xl font-bold text-purple-900">
+                      ₹{formatINR(summary.totalCustomers > 0 ? summary.totalSales / summary.totalCustomers : 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Top Customers Chart */}
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Top 10 Customers by Revenue</h3>
                   <Bar
                     data={{
-                      labels: topSellingItems.map(i => i.item_name),
+                      labels: customers.slice(0, 10).map(c => c.name),
                       datasets: [{
-                        label: 'Quantity Sold',
-                        data: topSellingItems.map(i => i.total_quantity),
+                        label: 'Total Revenue (₹)',
+                        data: customers.slice(0, 10).map(c => c.total),
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)'
+                      }]
+                    }}
+                    options={{ 
+                      responsive: true,
+                      indexAxis: 'y',
+                      plugins: { legend: { display: false } }
+                    }}
+                  />
+                </div>
+
+                {/* Customer Details Table */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="font-semibold">Detailed Customer Statistics</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Orders</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Revenue</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Order Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {customers.map((customer, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer.name}</td>
+                            <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{customer.count}</td>
+                            <td className="px-6 py-4 text-sm text-green-600 font-semibold">₹{formatINR(customer.total)}</td>
+                            <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{customer.totalItems}</td>
+                            <td className="px-6 py-4 text-sm text-purple-600 font-semibold">₹{formatINR(customer.avgOrderValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Category Analysis */}
+            {activeView === 'categories' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold text-gray-900">Category-wise Analysis</h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
+                    <p className="text-sm font-medium text-indigo-600">Total Categories</p>
+                    <p className="text-3xl font-bold text-indigo-900">{summary.totalCategories}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                    <p className="text-sm font-medium text-green-600">Total Stock Value</p>
+                    <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalInventoryValue)}</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                    <p className="text-sm font-medium text-blue-600">Total Items</p>
+                    <p className="text-3xl font-bold text-blue-900">{summary.totalItems}</p>
+                  </div>
+                </div>
+
+                {/* Category Sales Chart */}
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Category-wise Sales Revenue</h3>
+                  <Bar
+                    data={{
+                      labels: categories.map(c => c.category),
+                      datasets: [{
+                        label: 'Sales Revenue (₹)',
+                        data: categories.map(c => c.salesRevenue),
                         backgroundColor: 'rgba(34, 197, 94, 0.7)'
                       }]
                     }}
                     options={{ 
                       responsive: true,
-                      indexAxis: 'y',
+                       indexAxis: 'y',
                       plugins: { legend: { display: false } }
                     }}
                   />
                 </div>
 
-                {/* Top Purchased Items */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold mb-4">Top 10 Purchased Items by Quantity</h3>
-                  <Bar
-                    data={{
-                      labels: topPurchasedItems.map(i => i.item_name),
-                      datasets: [{
-                        label: 'Quantity Purchased',
-                        data: topPurchasedItems.map(i => i.total_quantity),
-                        backgroundColor: 'rgba(239, 68, 68, 0.7)'
-                      }]
-                    }}
-                    options={{ 
-                      responsive: true,
-                      indexAxis: 'y',
-                      plugins: { legend: { display: false } }
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Daily Trends */}
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Daily Sales vs Purchase Trend</h3>
-                <Line
-                  data={{
-                    labels: dailyTrends.map(d => new Date(d.date).toLocaleDateString()),
-                    datasets: [
-                      {
-                        label: 'Sales (₹)',
-                        data: dailyTrends.map(d => d.sales || 0),
-                        borderColor: 'rgb(34, 197, 94)',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                        tension: 0.3
-                      },
-                      {
-                        label: 'Purchases (₹)',
-                        data: dailyTrends.map(d => d.purchases || 0),
-                        borderColor: 'rgb(239, 68, 68)',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        tension: 0.3
-                      }
-                    ]
-                  }}
-                  options={{
-                    responsive: true,
-                    plugins: { legend: { position: 'top' } }
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Item Analysis */}
-          {activeView === 'items' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Complete Item-wise Analysis</h2>
-              
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Sold</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Revenue</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Purchased</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
-                        {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gross Profit</th> */}
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {itemAnalytics.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{item.item_name}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{item.total_quantity}</td>
-                          <td className="px-6 py-4 text-sm text-green-600 font-semibold">₹{formatINR(item.total_revenue)}</td>
-                          <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{item.purchased_quantity}</td>
-                          <td className="px-6 py-4 text-sm text-red-600 font-semibold">₹{formatINR(item.purchase_cost)}</td>
-                          {/* <td className="px-6 py-4 text-sm font-bold text-purple-600">₹{formatINR(item.gross_profit)}</td> */}
-                          <td className="px-6 py-4 text-sm text-gray-600">
-                            <div className="text-xs">
-                              <div>Sales: {item.transactions}</div>
-                              <div>Purchase: {item.purchase_transactions}</div>
-                            </div>
-                          </td>
+                {/* Category Details Table */}
+                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <h3 className="font-semibold">Detailed Category Statistics</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Items</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Value</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Sold</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Revenue</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {categories.map((category, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{category.category}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{category.totalItems}</td>
+                            <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{category.totalStock}</td>
+                            <td className="px-6 py-4 text-sm text-indigo-600 font-semibold">₹{formatINR(category.stockValue)}</td>
+                            <td className="px-6 py-4 text-sm text-green-600 font-semibold">{category.itemsSold}</td>
+                            <td className="px-6 py-4 text-sm text-green-700 font-bold">₹{formatINR(category.salesRevenue)}</td>
+                            <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{category.itemsPurchased}</td>
+                            <td className="px-6 py-4 text-sm text-red-600 font-semibold">₹{formatINR(category.purchaseCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Sales Details */}
-          {activeView === 'sales' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Sales Transaction Details</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
-                  <p className="text-sm font-medium text-green-600">Total Revenue</p>
-                  <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-600">Total Orders</p>
-                  <p className="text-3xl font-bold text-blue-900">{summary.totalOrders}</p>
-                </div>
-                {/* <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
-                  <p className="text-sm font-medium text-purple-600">Avg Order Value</p>
-                  <p className="text-3xl font-bold text-purple-900">₹{formatINR(summary.avgOrderValue)}</p>
-                </div> */}
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h3 className="font-semibold">All Sales Transactions</h3>
-                </div>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bill No</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {analyticsData.sales.map((sale, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{new Date(sale.sale_date).toLocaleDateString()}</td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{sale.bill_number}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{sale.customer_name || 'Walk-in'}</td>
-                          <td className="px-6 py-4 text-sm font-semibold text-green-600">₹{formatINR(sale.total_amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Purchase Details */}
-          {activeView === 'purchases' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Purchase Transaction Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-red-50 rounded-lg p-6 border border-red-200">
-                  <p className="text-sm font-medium text-red-600">Total Purchases</p>
-                  <p className="text-3xl font-bold text-red-900">₹{formatINR(summary.totalPurchases)}</p>
-                </div>
-                <div className="bg-orange-50 rounded-lg p-6 border border-orange-200">
-                  <p className="text-sm font-medium text-orange-600">Purchase Orders</p>
-                  <p className="text-3xl font-bold text-orange-900">{summary.totalPurchaseOrders}</p>
-                </div>
-                {/* <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
-                  <p className="text-sm font-medium text-yellow-600">Avg Purchase</p>
-                  <p className="text-3xl font-bold text-yellow-900">₹{formatINR(summary.avgPurchaseValue)}</p>
-                </div> */}
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h3 className="font-semibold">All Purchase Transactions</h3>
-                </div>
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice No</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {analyticsData.purchases.map((purchase, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{new Date(purchase.purchase_date).toLocaleDateString()}</td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{purchase.invoice_number}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{purchase.supplier_name || 'Unknown'}</td>
-                          <td className="px-6 py-4 text-sm font-semibold text-red-600">₹{formatINR(purchase.total_amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div> 
-              </div>
-            </div>
-          )}
-
-          {/* Customer Analysis */}
-          {activeView === 'customers' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Customer-wise Analysis</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-600">Total Customers</p>
-                  <p className="text-3xl font-bold text-blue-900">{summary.totalCustomers}</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
-                  <p className="text-sm font-medium text-green-600">Total Revenue</p>
-                  <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalSales)}</p>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
-                  <p className="text-sm font-medium text-purple-600">Avg per Customer</p>
-                  <p className="text-3xl font-bold text-purple-900">
-                    ₹{formatINR(summary.totalCustomers > 0 ? summary.totalSales / summary.totalCustomers : 0)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Top Customers Chart */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold mb-4">Top 10 Customers by Revenue</h3>
-                <Bar
-                  data={{
-                    labels: customers.slice(0, 10).map(c => c.name),
-                    datasets: [{
-                      label: 'Total Revenue (₹)',
-                      data: customers.slice(0, 10).map(c => c.total),
-                      backgroundColor: 'rgba(59, 130, 246, 0.7)'
-                    }]
-                  }}
-                  options={{ 
-                    responsive: true,
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } }
-                  }}
-                />
-              </div>
-
-              {/* Customer Details Table */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h3 className="font-semibold">Detailed Customer Statistics</h3>
-                </div>
-                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Orders</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Revenue</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Order Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {customers.map((customer, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{customer.name}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{customer.count}</td>
-                          <td className="px-6 py-4 text-sm text-green-600 font-semibold">₹{formatINR(customer.total)}</td>
-                          <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{customer.totalItems}</td>
-                          <td className="px-6 py-4 text-sm text-purple-600 font-semibold">₹{formatINR(customer.avgOrderValue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Category Analysis */}
-          {activeView === 'categories' && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Category-wise Analysis</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
-                  <p className="text-sm font-medium text-indigo-600">Total Categories</p>
-                  <p className="text-3xl font-bold text-indigo-900">{summary.totalCategories}</p>
-                </div>
-                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
-                  <p className="text-sm font-medium text-green-600">Total Stock Value</p>
-                  <p className="text-3xl font-bold text-green-900">₹{formatINR(summary.totalInventoryValue)}</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-600">Total Items</p>
-                  <p className="text-3xl font-bold text-blue-900">{summary.totalItems}</p>
-                </div>
-              </div>
-
-              {/* Category Sales Chart */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-semibold mb-4">Category-wise Sales Revenue</h3>
-                <Bar
-                  data={{
-                    labels: categories.map(c => c.category),
-                    datasets: [{
-                      label: 'Sales Revenue (₹)',
-                      data: categories.map(c => c.salesRevenue),
-                      backgroundColor: 'rgba(34, 197, 94, 0.7)'
-                    }]
-                  }}
-                  options={{ 
-                    responsive: true,
-                    plugins: { legend: { display: false } }
-                  }}
-                />
-              </div>
-
-              {/* Category Details Table */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                  <h3 className="font-semibold">Detailed Category Statistics</h3>
-                </div>
-                <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Items</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Value</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Sold</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Revenue</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items Purchased</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchase Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {categories.map((category, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{category.category}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{category.totalItems}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600 font-semibold">{category.totalStock}</td>
-                          <td className="px-6 py-4 text-sm text-indigo-600 font-semibold">₹{formatINR(category.stockValue)}</td>
-                          <td className="px-6 py-4 text-sm text-green-600 font-semibold">{category.itemsSold}</td>
-                          <td className="px-6 py-4 text-sm text-green-700 font-bold">₹{formatINR(category.salesRevenue)}</td>
-                          <td className="px-6 py-4 text-sm text-orange-600 font-semibold">{category.itemsPurchased}</td>
-                          <td className="px-6 py-4 text-sm text-red-600 font-semibold">₹{formatINR(category.purchaseCost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </div> 
+      </div> 
      </PinProtected>
-    </>
-   
-  );
+    );
 };
 
 export default Analytics;

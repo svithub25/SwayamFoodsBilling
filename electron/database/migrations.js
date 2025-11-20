@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 export function runMigrations(db) {
-  console.log('🔄 Checking database migrations...');
+  console.log(' Checking database migrations...');
 
   // Create migrations tracking table
   db.exec(`
@@ -44,22 +44,22 @@ export function runMigrations(db) {
   // ========================================
   const migration1 = 'add_is_locked_to_opening_stock';
   if (!migrationExists(migration1)) {
-    console.log(`📝 Running migration: ${migration1}`);
+    console.log(` Running migration: ${migration1}`);
     try {
       if (tableExists('opening_stock')) {
         if (!columnExists('opening_stock', 'is_locked')) {
           db.exec(`ALTER TABLE opening_stock ADD COLUMN is_locked INTEGER DEFAULT 0;`);
-          console.log('   ✅ Added is_locked column to opening_stock');
+          console.log('    Added is_locked column to opening_stock');
         }
         if (!columnExists('opening_stock', 'updated_at')) {
           db.exec(`ALTER TABLE opening_stock ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;`);
-          console.log('   ✅ Added updated_at column to opening_stock');
+          console.log('    Added updated_at column to opening_stock');
         }
       }
       markMigrationComplete(migration1);
-      console.log(`✅ Migration ${migration1} completed`);
+      console.log(` Migration ${migration1} completed`);
     } catch (error) {
-      console.error(`❌ Migration ${migration1} failed:`, error.message);
+      console.error(` Migration ${migration1} failed:`, error.message);
     }
   }
 
@@ -69,18 +69,18 @@ export function runMigrations(db) {
   // ========================================
   const migration3 = 'ensure_bank_accounts_status_code';
   if (!migrationExists(migration3)) {
-    console.log(`📝 Running migration: ${migration3}`);
+    console.log(` Running migration: ${migration3}`);
     try {
       if (tableExists('bank_accounts')) {
         if (!columnExists('bank_accounts', 'status_code')) {
           db.exec(`ALTER TABLE bank_accounts ADD COLUMN status_code INTEGER DEFAULT 0;`);
-          console.log('   ✅ Added status_code column to bank_accounts');
+          console.log('    Added status_code column to bank_accounts');
         }
       }
       markMigrationComplete(migration3);
-      console.log(`✅ Migration ${migration3} completed`);
+      console.log(` Migration ${migration3} completed`);
     } catch (error) {
-      console.error(`❌ Migration ${migration3} failed:`, error.message);
+      console.error(` Migration ${migration3} failed:`, error.message);
     }
   }
 
@@ -91,7 +91,7 @@ export function runMigrations(db) {
   // ========================================
   const migration6 = 'ensure_cash_account_exists';
   if (!migrationExists(migration6)) {
-    console.log(`📝 Running migration: ${migration6}`);
+    console.log(` Running migration: ${migration6}`);
     try {
       if (tableExists('bank_accounts')) {
         const cashAccount = db.prepare("SELECT * FROM bank_accounts WHERE account_name = 'Cash'").get();
@@ -101,65 +101,43 @@ export function runMigrations(db) {
             (account_name, account_number, bank_name, branch_name, ifsc_code, account_type, opening_balance, current_balance, is_active, status_code)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run('Cash', 'CASH-001', 'Cash in Hand', 'N/A', 'N/A', 'Current', 0, 0, 1, 0);
-          console.log('   ✅ Created default Cash account');
+          console.log('    Created default Cash account');
         }
       }
       markMigrationComplete(migration6);
-      console.log(`✅ Migration ${migration6} completed`);
+      console.log(` Migration ${migration6} completed`);
     } catch (error) {
-      console.error(`❌ Migration ${migration6} failed:`, error.message);
+      console.error(` Migration ${migration6} failed:`, error.message);
     }
   }
 
   
-  // ========================================
-  // MIGRATION 8: Ensure required indexes exist
-  // ========================================
-  const migration8 = 'create_required_indexes';
-  if (!migrationExists(migration8)) {
-    console.log(`📝 Running migration: ${migration8}`);
-    try {
-      db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(transaction_date);
-        CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(bank_account_id);
-        CREATE INDEX IF NOT EXISTS idx_bank_transactions_voucher ON bank_transactions(voucher_number);
-        CREATE INDEX IF NOT EXISTS idx_pdc_status ON post_dated_cheques(status);
-        CREATE INDEX IF NOT EXISTS idx_pdc_date ON post_dated_cheques(cheque_date);
-        CREATE INDEX IF NOT EXISTS idx_opening_stock_item_fy ON opening_stock(item_id, financial_year);
-      `);
-      console.log('   ✅ Created required indexes');
-      markMigrationComplete(migration8);
-      console.log(`✅ Migration ${migration8} completed`);
-    } catch (error) {
-      console.error(`❌ Migration ${migration8} failed:`, error.message);
-    }
-  }
 
   // ========================================
   // MIGRATION 9: Remove closing_stock table (deprecated)
   // ========================================
   const migration9 = 'deprecate_closing_stock_table';
   if (!migrationExists(migration9)) {
-    console.log(`📝 Running migration: ${migration9}`);
+    console.log(` Running migration: ${migration9}`);
     try {
       if (tableExists('closing_stock')) {
         // Backup data before dropping (optional)
         const closingStockData = db.prepare('SELECT COUNT(*) as count FROM closing_stock').get();
         if (closingStockData.count > 0) {
-          console.log(`   ⚠️  Warning: closing_stock table has ${closingStockData.count} records`);
-          console.log('   ℹ️  Consider migrating this data to opening_stock before dropping');
+          console.log(`Warning: closing_stock table has ${closingStockData.count} records`);
+          console.log('Consider migrating this data to opening_stock before dropping');
           // Don't drop if it has data - just warn
-          console.log('   ⏭️  Skipping drop of closing_stock table (has data)');
+          console.log('Skipping drop of closing_stock table (has data)');
         } else {
           // db.exec('DROP TABLE IF EXISTS closing_stock;');
-          // console.log('   ✅ Dropped deprecated closing_stock table');
-          console.log('   ℹ️  closing_stock table exists but is empty');
+          // console.log('Dropped deprecated closing_stock table');
+          console.log('closing_stock table exists but is empty');
         }
       }
       markMigrationComplete(migration9);
-      console.log(`✅ Migration ${migration9} completed`);
+      console.log(`Migration ${migration9} completed`);
     } catch (error) {
-      console.error(`❌ Migration ${migration9} failed:`, error.message);
+      console.error(` Migration ${migration9} failed:`, error.message);
     }
   }
 
@@ -168,54 +146,54 @@ export function runMigrations(db) {
   // ========================================
   const migration10 = 'add_missing_columns_to_tables';
   if (!migrationExists(migration10)) {
-    console.log(`📝 Running migration: ${migration10}`);
+    console.log(`Running migration: ${migration10}`);
     try {
       // Add customer_rate to sale_items if missing
       if (tableExists('sale_items') && !columnExists('sale_items', 'customer_rate')) {
         db.exec(`ALTER TABLE sale_items ADD COLUMN customer_rate REAL DEFAULT 0;`);
-        console.log('   ✅ Added customer_rate column to sale_items');
+        console.log('Added customer_rate column to sale_items');
       }
 
       // Add salesman_rate to sale_items if missing
       if (tableExists('sale_items') && !columnExists('sale_items', 'salesman_rate')) {
         db.exec(`ALTER TABLE sale_items ADD COLUMN salesman_rate REAL DEFAULT 0;`);
-        console.log('   ✅ Added salesman_rate column to sale_items');
+        console.log('Added salesman_rate column to sale_items');
       }
 
       // Add sale_type to sale_items if missing
       if (tableExists('sale_items') && !columnExists('sale_items', 'sale_type')) {
         db.exec(`ALTER TABLE sale_items ADD COLUMN sale_type TEXT DEFAULT 'customer';`);
-        console.log('   ✅ Added sale_type column to sale_items');
+        console.log('Added sale_type column to sale_items');
       }
 
       // Add is_approved to sales if missing
       if (tableExists('sales') && !columnExists('sales', 'is_approved')) {
         db.exec(`ALTER TABLE sales ADD COLUMN is_approved INTEGER DEFAULT 0;`);
-        console.log('   ✅ Added is_approved column to sales');
+        console.log(' Added is_approved column to sales');
       }
 
       // Add salesman_id to sales if missing
       if (tableExists('sales') && !columnExists('sales', 'salesman_id')) {
         db.exec(`ALTER TABLE sales ADD COLUMN salesman_id INTEGER DEFAULT NULL;`);
-        console.log('   ✅ Added salesman_id column to sales');
+        console.log(' Added salesman_id column to sales');
       }
 
       // Add sale_type to sales if missing
       if (tableExists('sales') && !columnExists('sales', 'sale_type')) {
         db.exec(`ALTER TABLE sales ADD COLUMN sale_type TEXT DEFAULT 'customer';`);
-        console.log('   ✅ Added sale_type column to sales');
+        console.log('    Added sale_type column to sales');
       }
 
       markMigrationComplete(migration10);
-      console.log(`✅ Migration ${migration10} completed`);
+      console.log(` Migration ${migration10} completed`);
     } catch (error) {
-      console.error(`❌ Migration ${migration10} failed:`, error.message);
+      console.error(` Migration ${migration10} failed:`, error.message);
     }
   }
 
-  console.log('✅ All migrations completed successfully!');
+  console.log(' All migrations completed successfully!');
   
   // Print migration summary
   const completedMigrations = db.prepare('SELECT COUNT(*) as count FROM schema_migrations').get();
-  console.log(`📊 Total migrations completed: ${completedMigrations.count}`);
+  console.log(` Total migrations completed: ${completedMigrations.count}`);
 }

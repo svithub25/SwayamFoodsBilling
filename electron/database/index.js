@@ -472,6 +472,156 @@ db.exec(`
   ON opening_stock(item_id, financial_year);
 `);
 
+ // ============================================
+  // CREATE INDEXES FOR PERFORMANCE OPTIMIZATION
+  // ============================================
+  db.exec(`
+    -- Users table indexes
+    CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+    CREATE INDEX IF NOT EXISTS idx_users_status ON users(status_code);
+
+    -- Categories table indexes
+    CREATE INDEX IF NOT EXISTS idx_categories_name ON categories(name);
+    CREATE INDEX IF NOT EXISTS idx_categories_status ON categories(status_code);
+
+    -- Suppliers table indexes
+    CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
+    CREATE INDEX IF NOT EXISTS idx_suppliers_contact ON suppliers(contact);
+    CREATE INDEX IF NOT EXISTS idx_suppliers_gstin ON suppliers(gstin);
+    CREATE INDEX IF NOT EXISTS idx_suppliers_status ON suppliers(status_code);
+
+    -- Items table indexes (CRITICAL for inventory queries)
+    CREATE INDEX IF NOT EXISTS idx_items_name ON items(name);
+    CREATE INDEX IF NOT EXISTS idx_items_sku ON items(sku);
+    CREATE INDEX IF NOT EXISTS idx_items_hsn_code ON items(hsn_code);
+    CREATE INDEX IF NOT EXISTS idx_items_category_id ON items(category_id);
+    CREATE INDEX IF NOT EXISTS idx_items_status ON items(status_code);
+    CREATE INDEX IF NOT EXISTS idx_items_current_stock ON items(current_stock);
+    CREATE INDEX IF NOT EXISTS idx_items_low_stock ON items(current_stock, minimum_stock);
+    CREATE INDEX IF NOT EXISTS idx_items_last_supplier ON items(last_supplier_id);
+
+    -- Purchases table indexes
+    CREATE INDEX IF NOT EXISTS idx_purchases_supplier_id ON purchases(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_purchases_date ON purchases(purchase_date);
+    CREATE INDEX IF NOT EXISTS idx_purchases_invoice ON purchases(invoice_number);
+    CREATE INDEX IF NOT EXISTS idx_purchases_status ON purchases(status_code);
+    CREATE INDEX IF NOT EXISTS idx_purchases_payment ON purchases(is_paid);
+    CREATE INDEX IF NOT EXISTS idx_purchases_date_supplier ON purchases(purchase_date, supplier_id);
+
+    -- Purchase Items table indexes
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase_id ON purchase_items(purchase_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_item_id ON purchase_items(item_id);
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_status ON purchase_items(status_code);
+    CREATE INDEX IF NOT EXISTS idx_purchase_items_composite ON purchase_items(purchase_id, item_id);
+
+    -- Sales table indexes (CRITICAL for billing and reports)
+    CREATE INDEX IF NOT EXISTS idx_sales_bill_number ON sales(bill_number);
+    CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+    CREATE INDEX IF NOT EXISTS idx_sales_customer_name ON sales(customer_name);
+    CREATE INDEX IF NOT EXISTS idx_sales_customer_contact ON sales(customer_contact);
+    CREATE INDEX IF NOT EXISTS idx_sales_salesman_id ON sales(salesman_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_sale_type ON sales(sale_type);
+    CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(status_code);
+    CREATE INDEX IF NOT EXISTS idx_sales_payment ON sales(is_paid);
+    CREATE INDEX IF NOT EXISTS idx_sales_approval ON sales(is_approved);
+    CREATE INDEX IF NOT EXISTS idx_sales_date_customer ON sales(sale_date, customer_name);
+    CREATE INDEX IF NOT EXISTS idx_sales_date_salesman ON sales(sale_date, salesman_id);
+
+    -- Sale Items table indexes (CRITICAL for analytics)
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_item_id ON sale_items(item_id);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_status ON sale_items(status_code);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_sale_type ON sale_items(sale_type);
+    CREATE INDEX IF NOT EXISTS idx_sale_items_composite ON sale_items(sale_id, item_id);
+
+    -- Customer table indexes
+    CREATE INDEX IF NOT EXISTS idx_customer_name ON customer(name);
+    CREATE INDEX IF NOT EXISTS idx_customer_contact ON customer(contact);
+    CREATE INDEX IF NOT EXISTS idx_customer_gstin ON customer(gstin);
+    CREATE INDEX IF NOT EXISTS idx_customer_status ON customer(status_code);
+
+    -- Salesman table indexes
+    CREATE INDEX IF NOT EXISTS idx_salesman_name ON salesman(name);
+    CREATE INDEX IF NOT EXISTS idx_salesman_contact ON salesman(contact_info);
+    CREATE INDEX IF NOT EXISTS idx_salesman_status ON salesman(status_code);
+
+    -- Payment Verification indexes
+    CREATE INDEX IF NOT EXISTS idx_payment_verification_sale ON payment_verification(sale_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_verification_purchase ON payment_verification(purchase_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_verification_date ON payment_verification(payment_date);
+    CREATE INDEX IF NOT EXISTS idx_payment_verification_status ON payment_verification(status);
+    CREATE INDEX IF NOT EXISTS idx_payment_verification_method ON payment_verification(payment_method);
+
+    -- Payment UPI indexes
+    CREATE INDEX IF NOT EXISTS idx_payment_upi_verification ON payment_upi(payment_verification_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_upi_transaction ON payment_upi(transaction_id);
+
+    -- Payment Cash indexes
+    CREATE INDEX IF NOT EXISTS idx_payment_cash_verification ON payment_cash(payment_verification_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_cash_receipt ON payment_cash(receipt_number);
+
+    -- Payment NEFT/RTGS indexes
+    CREATE INDEX IF NOT EXISTS idx_payment_neft_verification ON payment_neft_rtgs(payment_verification_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_neft_reference ON payment_neft_rtgs(transaction_reference);
+
+    -- Payment Cheque indexes
+    CREATE INDEX IF NOT EXISTS idx_payment_cheque_verification ON payment_cheque(payment_verification_id);
+    CREATE INDEX IF NOT EXISTS idx_payment_cheque_number ON payment_cheque(cheque_number);
+    CREATE INDEX IF NOT EXISTS idx_payment_cheque_status ON payment_cheque(status);
+    CREATE INDEX IF NOT EXISTS idx_payment_cheque_date ON payment_cheque(cheque_date);
+
+    -- Closing Stock indexes
+    CREATE INDEX IF NOT EXISTS idx_closing_stock_item ON closing_stock(item_id);
+    CREATE INDEX IF NOT EXISTS idx_closing_stock_date ON closing_stock(closing_date);
+    CREATE INDEX IF NOT EXISTS idx_closing_stock_composite ON closing_stock(item_id, closing_date);
+
+    -- Opening Stock indexes
+    CREATE INDEX IF NOT EXISTS idx_opening_stock_item_fy ON opening_stock(item_id, financial_year);
+    CREATE INDEX IF NOT EXISTS idx_opening_stock_fy ON opening_stock(financial_year);
+    CREATE INDEX IF NOT EXISTS idx_opening_stock_date ON opening_stock(opening_date);
+
+    -- Sale Item Cost Allocation indexes
+    CREATE INDEX IF NOT EXISTS idx_cost_allocation_sale ON sale_item_cost_allocation(sale_item_id);
+    CREATE INDEX IF NOT EXISTS idx_cost_allocation_purchase ON sale_item_cost_allocation(purchase_item_id);
+
+    -- Settings indexes
+    CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+
+    -- Banking indexes (already exist, but adding more)
+    CREATE INDEX IF NOT EXISTS idx_bank_accounts_name ON bank_accounts(account_name);
+    CREATE INDEX IF NOT EXISTS idx_bank_accounts_number ON bank_accounts(account_number);
+    CREATE INDEX IF NOT EXISTS idx_bank_accounts_active ON bank_accounts(is_active);
+    CREATE INDEX IF NOT EXISTS idx_bank_accounts_type ON bank_accounts(account_type);
+    
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_date ON bank_transactions(transaction_date);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(bank_account_id);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_voucher ON bank_transactions(voucher_number);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_type ON bank_transactions(voucher_type);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_party ON bank_transactions(party_name);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_status ON bank_transactions(cleared_status);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_reconciled ON bank_transactions(reconciled);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_cheque ON bank_transactions(cheque_number);
+    CREATE INDEX IF NOT EXISTS idx_bank_transactions_date_account ON bank_transactions(transaction_date, bank_account_id);
+    
+    CREATE INDEX IF NOT EXISTS idx_bank_ledger_transaction ON bank_ledger_entries(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_bank_ledger_type ON bank_ledger_entries(ledger_type);
+    CREATE INDEX IF NOT EXISTS idx_bank_ledger_name ON bank_ledger_entries(ledger_name);
+    
+    CREATE INDEX IF NOT EXISTS idx_bank_reconciliation_account ON bank_reconciliation(bank_account_id);
+    CREATE INDEX IF NOT EXISTS idx_bank_reconciliation_date ON bank_reconciliation(statement_date);
+    
+    CREATE INDEX IF NOT EXISTS idx_transaction_categories_name ON transaction_categories(category_name);
+    CREATE INDEX IF NOT EXISTS idx_transaction_categories_type ON transaction_categories(category_type);
+    CREATE INDEX IF NOT EXISTS idx_transaction_categories_active ON transaction_categories(is_active);
+    
+    CREATE INDEX IF NOT EXISTS idx_pdc_transaction ON post_dated_cheques(transaction_id);
+    CREATE INDEX IF NOT EXISTS idx_pdc_status ON post_dated_cheques(status);
+    CREATE INDEX IF NOT EXISTS idx_pdc_date ON post_dated_cheques(cheque_date);
+    CREATE INDEX IF NOT EXISTS idx_pdc_party ON post_dated_cheques(party_name);
+    CREATE INDEX IF NOT EXISTS idx_pdc_cheque_number ON post_dated_cheques(cheque_number);
+    CREATE INDEX IF NOT EXISTS idx_pdc_status_date ON post_dated_cheques(status, cheque_date);
+  `);
+
 const defaultCashAccount = db.prepare('SELECT * FROM bank_accounts WHERE account_name = ?').get('Cash');
 if (!defaultCashAccount) {
   db.prepare(`
@@ -494,7 +644,7 @@ if (!defaultCashAccount) {
   try {
     runMigrations(db);
   } catch (error) {
-    console.error('❌ Migration error:', error);
+    console.error(' Migration error:', error);
   }
 
 

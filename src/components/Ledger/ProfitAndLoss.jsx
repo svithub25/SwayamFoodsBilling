@@ -4,11 +4,19 @@ import { Calendar, Download, TrendingUp, TrendingDown, DollarSign, RefreshCw } f
 const ProfitAndLoss = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
-  const [filters, setFilters] = useState({
-    startDate: new Date(new Date().getFullYear(), 3, 1).toISOString().split('T')[0], // Financial year start (April 1)
-    endDate: new Date().toISOString().split('T')[0]
-  });
-
+ const [filters, setFilters] = useState({
+  startDate: (() => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0-indexed
+    
+    // If current month is Jan-Mar (0-2), financial year started last year
+    // If current month is Apr-Dec (3-11), financial year started this year
+    const fyStartYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+    return `${fyStartYear}-04-01`; // April 1st in YYYY-MM-DD format
+  })(),
+  endDate: new Date().toISOString().split('T')[0]
+});
   useEffect(() => {
     loadProfitAndLoss();
     // eslint-disable-next-line react-hooks/exhaustive-deps

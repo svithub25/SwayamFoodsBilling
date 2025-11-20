@@ -1,4 +1,4 @@
-import { Download, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User, SendHorizontal } from 'lucide-react';
+import { Download, Printer, RefreshCw, Save, Search, ShoppingCart, Trash2, User, SendHorizontal, Calendar, X } from 'lucide-react';
 import { useHotkeys } from "react-hotkeys-hook";
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -7,22 +7,39 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const Billing = () => {
+  // Load saved state from sessionStorage or use defaults
+  const loadSavedState = () => {
+    const saved = sessionStorage.getItem('billingState');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error loading saved state:', e);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const savedState = loadSavedState();
+
   const [items, setItems] = useState([]);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(savedState?.cart || []);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchDropdown, setSearchDropdown] = useState(false);
   const [searchIndex, setSearchIndex] = useState(0);
-  const [discount, setDiscount] = useState(0);
+  const [discount, setDiscount] = useState(savedState?.discount || 0);
   const [billNumber, setBillNumber] = useState('');
+  const [billDate, setBillDate] = useState(savedState?.billDate || new Date().toISOString().split('T')[0]);
   const [salesmen, setSalesmen] = useState([]);
-  const [selectedSalesman, setSelectedSalesman] = useState('');
-  const [billNarration, setBillNarration] = useState('');
+  const [selectedSalesman, setSelectedSalesman] = useState(savedState?.selectedSalesman || '');
+  const [billNarration, setBillNarration] = useState(savedState?.billNarration || '');
   const [customers, setCustomers] = useState([]);
   const [customerDropdown, setCustomerDropdown] = useState(false);
   const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
-  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(false);
-  const [isOthers, setIsOthers] = useState(false);
+  const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(savedState?.isSalesmanCustomer || false);
+  const [isOthers, setIsOthers] = useState(savedState?.isOthers || false);
   
   // Refs
   const discountInputRef = useRef();
@@ -32,7 +49,12 @@ const Billing = () => {
   const customerContactInputRef = useRef();
 
   // Customer info
-  const [customerInfo, setCustomerInfo] = useState({ name: '', contact: '', address: '', gstin: '' });
+  const [customerInfo, setCustomerInfo] = useState(savedState?.customerInfo || { 
+    name: '', 
+    contact: '', 
+    address: '', 
+    gstin: '' 
+  });
 
   // Hotkeys
   useHotkeys('ctrl+k', (e) => { e.preventDefault(); searchInputRef.current?.focus(); }, { enableOnTags: ['INPUT'] });
@@ -46,10 +68,41 @@ const Billing = () => {
     fetchCustomers();
   }, []);
 
+  // Save state to sessionStorage whenever it changes
+  useEffect(() => {
+    const stateToSave = {
+      cart,
+      discount,
+      billDate,
+      selectedSalesman,
+      billNarration,
+      customerInfo,
+      isSalesmanCustomer,
+      isOthers
+    };
+    sessionStorage.setItem('billingState', JSON.stringify(stateToSave));
+  }, [cart, discount, billDate, selectedSalesman, billNarration, customerInfo, isSalesmanCustomer, isOthers]);
+
   const loadItems = async () => {
     try {
       const data = await window.electronAPI.getInventory();
       setItems(data);
+      
+      // Update cart items with latest stock info if cart was loaded from session
+      if (savedState?.cart && savedState.cart.length > 0) {
+        const updatedCart = savedState.cart.map(cartItem => {
+          const freshItem = data.find(item => item.id === cartItem.id);
+          if (freshItem) {
+            return {
+              ...cartItem,
+              current_stock: freshItem.current_stock,
+              unit_price: cartItem.unit_price // Keep the original price from saved state
+            };
+          }
+          return cartItem;
+        });
+        setCart(updatedCart);
+      }
     } catch (error) {
       console.error('Error loading items:', error);
     } finally {
@@ -84,11 +137,24 @@ const Billing = () => {
     }
   };
 
+  // Clear all form data
+  const clearForm = () => {
+  setCart([]);
+  setDiscount(0);
+  setBillDate(new Date().toISOString().split('T')[0]);
+  setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+  setBillNarration('');
+  setSelectedSalesman('');
+  setIsSalesmanCustomer(false);
+  setIsOthers(false);
+  sessionStorage.removeItem('billingState');
+  return true ;
+};
+
   // --- Fast item search and add ---
   const filteredItems = items.filter(item =>
     (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
-    //&& item.current_stock > 0
   );
 
   const handleSearchKeyDown = (e) => {
@@ -189,7 +255,8 @@ const Billing = () => {
   };
 
   const updateCartItemQuantity = (itemId, newQuantity) => {
-    if (!newQuantity || newQuantity <= 0) {
+    // Check for invalid quantities (null, undefined, empty string, 0, negative)
+    if (!newQuantity || newQuantity <= 0 || isNaN(newQuantity)) {
       removeFromCart(itemId);
       return;
     }
@@ -235,12 +302,12 @@ const Billing = () => {
     }
     
     // Stock validation
-    // for (const cartItem of filteredCart) {
-    //   if (parseInt(cartItem.quantity) > cartItem.current_stock) {
-    //     toast.error(`Insufficient stock for ${cartItem.name}. Available: ${cartItem.current_stock}`);
-    //     return;
-    //   }
-    // }
+    for (const cartItem of filteredCart) {
+      if (parseInt(cartItem.quantity) > cartItem.current_stock) {
+        toast.error(`Insufficient stock for ${cartItem.name}. Available: ${cartItem.current_stock}`);
+        return;
+      }
+    }
     
     try {
       // Create customer if needed
@@ -270,7 +337,7 @@ const Billing = () => {
         customer_contact: customerInfo.contact || null,
         customer_address: customerInfo.address || null,
         customer_gstin: customerInfo.gstin || null,
-        sale_date: new Date().toISOString().split('T')[0],
+        sale_date: billDate,
         items: saleItems,
         discount,
         total_amount: getFinalTotal(),
@@ -364,22 +431,25 @@ const Billing = () => {
             document.body.removeChild(pdfContainer);
           }, 1000);
         } catch (err) {
+          console.error('PDF/Print error:', err);
           toast.error('Error generating PDF/Print');
         }
       }
 
-      // Reset form
-      setCart([]);
-      setDiscount(0);
-      setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
-      setBillNarration('');
-      setSelectedSalesman('');
-      setIsSalesmanCustomer(false);
-      setIsOthers(false);
       await generateBillNumber();
       await loadItems();
       await fetchCustomers();
+
+      // Reset form and clear session storage - SINGLE CALL TO clearForm()
+        clearForm();
+      
+   
+   
+      
       toast.success('Sale completed successfully!');
+     
+       
+      // Reload data
       
     } catch (error) {
       console.error('Error completing sale:', error);
@@ -441,17 +511,42 @@ const Billing = () => {
           <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
           <p className="text-gray-600">Create invoices and manage billing transactions</p>
         </div>
-        <div className="mt-4 sm:mt-0 bg-blue-50 px-4 py-2 rounded-lg">
-          <span className="text-sm font-medium text-blue-800">Bill No: {billNumber}</span>
+        <div className="mt-4 sm:mt-0 flex items-center gap-3">
+          <div className="bg-blue-50 px-4 py-2 rounded-lg">
+            <span className="text-sm font-medium text-blue-800">Bill No: {billNumber}</span>
+          </div>
+          <button
+            onClick={clearForm}
+            className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+            title="Clear all billing information"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Clear Form
+          </button>
         </div>
       </div> 
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Items List */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Bill Date Selection */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-4">
+              <Calendar className="w-5 h-5 text-gray-500" />
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bill Date</label>
+                <input
+                  type="date"
+                  value={billDate}
+                  onChange={(e) => setBillDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
 
-
-           {/* Search */}
+          {/* Search */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -496,6 +591,7 @@ const Billing = () => {
               )}
             </div>
           </div>
+
           {/* Customer Information */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -666,8 +762,6 @@ const Billing = () => {
               placeholder="Additional notes for this bill..."
             />
           </div>
-
-         
         </div>
 
         {/* Cart */}
@@ -709,11 +803,17 @@ const Billing = () => {
                               min={1}
                               max={item.current_stock}
                               onChange={e => {
-                                const val = parseInt(e.target.value);
-                                if (!val || val <= 0) {
+                                const val = e.target.value;
+                                // If empty string or invalid, remove item
+                                if (val === '' || val === null || val === undefined) {
+                                  removeFromCart(item.id);
+                                  return;
+                                }
+                                const numVal = parseInt(val);
+                                if (isNaN(numVal) || numVal <= 0) {
                                   removeFromCart(item.id);
                                 } else {
-                                  updateCartItemQuantity(item.id, val);
+                                  updateCartItemQuantity(item.id, numVal);
                                 }
                               }}
                               onKeyDown={e => handleCartKeyDown(e, idx, item.id)}
@@ -725,7 +825,7 @@ const Billing = () => {
                           </div>
                         </div>
 
-                        {/* Unit Price Input */}
+                        {/* Unit Price Input */} 
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Unit Price</label>
                           <input
@@ -821,7 +921,7 @@ const Billing = () => {
                     Complete & Generate PDF
                   </button>
                   <button
-                    onClick={()=> toast.info('Comming Soon')}
+                    onClick={()=> toast.info('Coming Soon')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
                   >
@@ -829,7 +929,7 @@ const Billing = () => {
                     WhatsApp Invoice
                   </button>
                 </div>
-              </div>
+              </div> 
             )}
           </div>
         </div>
