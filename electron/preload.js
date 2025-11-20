@@ -151,6 +151,17 @@ const channelGroups = {
     lockAllOpeningStocks: 'lock-all-opening-stocks',
     calculateOpeningFromClosing: 'calculate-opening-from-closing'
   },
+    company: {
+    getCompanyInfo: 'get-company-info',
+    verifyCompanyPin: 'verify-company-pin',
+    updateCompanyInfo: 'update-company-info',
+    changeCompanyPin: 'change-company-pin',
+    toggleCompanyLock: 'toggle-company-lock',
+    uploadCompanyLogo: 'upload-company-logo',
+    removeCompanyLogo: 'remove-company-logo',
+    getDefaultLogoPath: 'get-default-logo-path',
+     getLogoAsBase64: 'get-logo-as-base64' ,
+  },
   // closingStock: {
   //   updateClosingStock: 'update-closing-stock',
   //   getClosingStock: 'get-closing-stock',

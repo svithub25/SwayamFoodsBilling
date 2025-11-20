@@ -621,6 +621,59 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_pdc_cheque_number ON post_dated_cheques(cheque_number);
     CREATE INDEX IF NOT EXISTS idx_pdc_status_date ON post_dated_cheques(status, cheque_date);
   `);
+  db.exec(`
+  CREATE TABLE IF NOT EXISTS company_info (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    company_name TEXT NOT NULL DEFAULT 'Your Company Name',
+    tagline TEXT DEFAULT 'Your Business Tagline',
+    address_line1 TEXT DEFAULT 'Address Line 1',
+    address_line2 TEXT DEFAULT 'Address Line 2',
+    city TEXT DEFAULT 'City',
+    state TEXT DEFAULT 'State',
+    pincode TEXT DEFAULT '000000',
+    country TEXT DEFAULT 'India',
+    phone TEXT DEFAULT '0000000000',
+    mobile TEXT DEFAULT '0000000000',
+    email TEXT DEFAULT 'info@company.com',
+    website TEXT DEFAULT 'www.company.com',
+    gstin TEXT DEFAULT '',
+    pan TEXT DEFAULT '',
+    cin TEXT DEFAULT '',
+    logo_path TEXT DEFAULT '',
+    footer_text TEXT DEFAULT 'Thank you for your business!',
+    bank_name TEXT DEFAULT '',
+    bank_account_number TEXT DEFAULT '',
+    bank_ifsc TEXT DEFAULT '',
+    bank_branch TEXT DEFAULT '',
+    edit_pin TEXT NULL,
+    is_locked INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  -- Insert default company info
+  INSERT OR IGNORE INTO company_info (
+    id, company_name, tagline, address_line1, address_line2, 
+    city, state, pincode, phone, mobile, email, website, 
+    footer_text
+  ) VALUES (
+    1, 
+    'Company Name', 
+    'Tagline Here',
+    'Address Line 1',
+    'Address Line 2',
+    'City',
+    'State',
+    'Pincode',
+    'Phone',
+    'Mobile',
+    'Email',
+    'Website',
+    'Thank you for your business! Visit us again.'
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_company_info_id ON company_info(id);
+`);
 
 const defaultCashAccount = db.prepare('SELECT * FROM bank_accounts WHERE account_name = ?').get('Cash');
 if (!defaultCashAccount) {

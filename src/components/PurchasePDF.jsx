@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import companyLogo from "../Assets/logo.png";
+import { Building2 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -14,6 +15,32 @@ function PurchasePDF({
   purchaseDate = "",
   invoiceNumber = ""
 }) {
+  const [companyInfo, setCompanyInfo] = useState(null);
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+
+  useEffect(() => {
+    loadCompanyInfo();
+  }, []);
+
+  const loadCompanyInfo = async () => {
+    try {
+      const result = await window.electronAPI.getCompanyInfo();
+      if (result.success && result.data) {
+        setCompanyInfo(result.data);
+        
+        // Load logo if exists
+        if (result.data.logo_path) {
+          const logoResult = await window.electronAPI.getLogoAsBase64(result.data.logo_path);
+          if (logoResult.success) {
+            setLogoDataUrl(logoResult.dataUrl);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading company info:', error);
+    }
+  };
+
   // Split items into pages
   const pages = [];
   for (let i = 0; i < items.length; i += ITEMS_PER_PAGE) {
@@ -21,30 +48,54 @@ function PurchasePDF({
   }
 
   const Header = () => (
-    <div className="flex items-center   border-b border-[hsl(220_13%_91%)] pb-6 mb-8">
-          <div className="flex items-center gap-8">
+    <div className="border-b border-[hsl(220_13%_91%)] pb-3 mb-8">
+      {/* Invoice text centered */}
+      <div className="flex justify-center mb-2">
+        <h2 className="text-2xl font-bold text-[hsl(214_84%_56%)]">PURCHASE INVOICE</h2>
+      </div>
+      
+      {/* Company info below */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4">
+          {logoDataUrl ? (
             <img
-              src={companyLogo}
+              src={logoDataUrl}
               alt="Company Logo"
-              className="w-45 h-32 object-contain"
+              className="w-28 h-28 object-contain"
             />
-            {/* <div>
-              <h1 className="text-2xl font-bold text-[hsl(217_19%_35%)]">
-                Swayam
-              </h1> 
-            </div> */}
-          </div>
-          <div className="text-left ml-12 space-y-1">
-          
-              <h2 className="text-2xl font-bold text-[hsl(214_84%_56%)]">INVOICE</h2>
-              <div className="text-sm text-[hsl(215.4_16.3%_46.9%)] space-y-1">
-                <p>Office Add. : 1815, D Ward, Shukrawar Peth, kadre Galli, near Piwla wada, Kolhapur</p>
-                <p>Shop Add. : Tele Galli, Sukrawar Peth, Kolhapur</p>
-                {/* <p>Kolhapur</p> */}
-                <p>Phone: 9371446315</p>
-              </div>
+          ) : (
+            <div className="w-28 h-28 flex items-center justify-center border border-gray-300">
+              <Building2 className="w-16 h-16 text-gray-400" />
             </div>
+          )}
         </div>
+        <div className="text-left ml-8 flex-1 space-y-1">
+          <h2 className="text-2xl font-bold text-[hsl(217_19%_35%)]">
+            {companyInfo?.company_name || 'Company Name'}
+          </h2>
+          {companyInfo?.tagline && (
+            <p className="text-xs italic text-[hsl(215.4_16.3%_46.9%)]">{companyInfo.tagline}</p>
+          )}
+          <div className="text-xs text-[hsl(215.4_16.3%_46.9%)] space-y-0.5 mt-1">
+            {companyInfo?.address_line1 && <p>{companyInfo.address_line1}</p>}
+            {companyInfo?.address_line2 && <p>{companyInfo.address_line2}</p>}
+            {(companyInfo?.city || companyInfo?.state || companyInfo?.pincode) && (
+              <p>
+                {[companyInfo?.city, companyInfo?.state, companyInfo?.pincode]
+                  .filter(Boolean)
+                  .join(', ')}
+              </p>
+            )}
+            {companyInfo?.phone && <p>Phone: {companyInfo.phone}</p>}
+            {companyInfo?.mobile && companyInfo?.mobile !== companyInfo?.phone && (
+              <p>Mobile: {companyInfo.mobile}</p>
+            )}
+            {companyInfo?.email && <p>Email: {companyInfo.email}</p>}
+            {companyInfo?.gstin && <p>GSTIN: {companyInfo.gstin}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 
   const PurchaseDetails = () => (
@@ -96,7 +147,6 @@ function PurchasePDF({
           <thead>
             <tr className="bg-[hsl(214_84%_56%)] text-white">
               <th className="text-left py-3 px-4 font-semibold text-xs">Sr No</th>
-              {/* <th className="text-left py-3 px-4 font-semibold text-xs">HSN Code</th> */}
               <th className="text-left py-3 px-4 font-semibold text-xs">Item</th>
               <th className="text-center py-3 px-4 font-semibold text-xs">Quantity</th>
               <th className="text-center py-3 px-4 font-semibold text-xs">Rate</th>
@@ -115,7 +165,6 @@ function PurchasePDF({
                   }`}
                 >
                   <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">{globalIndex + 1}</td>
-                  {/* <td className="py-3 px-4 text-xs font-mono text-[hsl(215.4_16.3%_46.9%)]">{item.hsn_code}</td> */}
                   <td className="py-3 px-4 text-xs text-[hsl(222.2_84%_4.9%)] font-medium">{item.name}</td>
                   <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">{item.quantity}</td>
                   <td className="py-3 px-4 text-xs text-center text-[hsl(222.2_84%_4.9%)]">₹{item.unit_price}</td>
@@ -127,7 +176,6 @@ function PurchasePDF({
             {/* Fill empty rows to maintain consistent height */}
             {Array.from({ length: ITEMS_PER_PAGE - pageItems.length }, (_, idx) => (
               <tr key={`empty-${idx}`} className="border-b border-[hsl(220_13%_91%)]">
-                <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
                 <td className="py-3 px-4 text-xs">&nbsp;</td>
@@ -158,7 +206,7 @@ function PurchasePDF({
         {roundingOff !== 0 && (   
         <div>
           <span className="font-semibold text-sm">Rounding Off:</span>
-          <span className="ml-2 text-sm">{roundingOff >= 0 ? '+' : '-'}₹{roundingOff.toFixed(2)}</span>
+          <span className="ml-2 text-sm">{roundingOff >= 0 ? '+' : '-'}₹{Math.abs(roundingOff).toFixed(2)}</span>
         </div>
         )} 
         <div className="border-t pt-2">
@@ -173,19 +221,19 @@ function PurchasePDF({
     <div className="border-t border-[hsl(220_13%_91%)] pt-4">
       <div className="text-center space-y-2">
         <p className="text-[hsl(217_19%_35%)] font-semibold text-sm">
-          Thank you for your business!
+          {companyInfo?.footer_text || 'Thank you for your business!'}
         </p>
         <p className="text-xs text-[hsl(215.4_16.3%_46.9%)]">
           This is a computer-generated purchase and does not require signature.
         </p>
-        <div className="flex justify-center space-x-4 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
-         <span>Email: swayamkolhapur@gmail.com</span>
-            <span>•</span>
-            <span>Phone: 9371446315</span>
-            <span>•</span>
-            <span>Facebook : स्वयंम् </span>
-            <span>•</span>
-            <span>Instagram : swayamkolhapur </span>
+        <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs text-[hsl(215.4_16.3%_46.9%)] mt-3">
+          {companyInfo?.email && <span>Email: {companyInfo.email}</span>}
+          {companyInfo?.email && (companyInfo?.phone || companyInfo?.mobile) && <span>•</span>}
+          {(companyInfo?.phone || companyInfo?.mobile) && (
+            <span>Phone: {companyInfo?.phone || companyInfo?.mobile}</span>
+          )}
+          {companyInfo?.website && <span>•</span>}
+          {companyInfo?.website && <span>Web: {companyInfo.website}</span>}
         </div>
       </div>
     </div>

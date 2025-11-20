@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
+  Building2, 
   Package, 
   ShoppingCart,  
   ReceiptIndianRupee,
@@ -49,8 +50,10 @@ const Layout = ({ children, user, onLogout }) => {
     { name: 'Analytics', href: '/analytics', icon: BarChart3 }, 
     { name: 'Export', href: '/export', icon: Download }, 
     // { name: 'openingstock', href: '/openingstock', icon: Download }, 
+    
     { name: 'Backup', href: '/backup', icon: Database },
     { name: 'Admin', href: '/admin', icon: Settings },
+    { name: 'Company', href: '/company', icon: Building2 },
     { name: 'Contact Us', href: '/contact', icon: MessageSquareShare },
   ];
 

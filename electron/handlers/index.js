@@ -16,12 +16,13 @@ import { registerBillMessageHandlers } from './messages.js';
 import { registerPrintingHandler } from './printing.js';
 import { registerAppInfoHandler } from './appInfo.js';
 import { registerOpeningStockHandlers} from './openingstock.js';
+import { registerCompanyHandlers } from './company.js';
 
 export function registerAllHandlers(context) {
   const {
     ipcMain,
     getDb,
-    dialog,
+    dialog, // Make sure dialog is passed
     shell,
     mainWindow,
     isDev,
@@ -40,6 +41,7 @@ export function registerAllHandlers(context) {
   registerCustomerHandlers({ ipcMain, getDb });
   registerSalesmanHandlers({ ipcMain, getDb });
 
+   registerCompanyHandlers({ ipcMain, getDb, dialog });
   // const reduceClosingStock = createClosingStockReducer(getDb);
   // registerClosingStockHandlers({ ipcMain, getDb });
   registerOpeningStockHandlers({ ipcMain, getDb });

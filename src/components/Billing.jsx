@@ -40,7 +40,7 @@ const Billing = () => {
   const [customerDropdownIndex, setCustomerDropdownIndex] = useState(0);
   const [isSalesmanCustomer, setIsSalesmanCustomer] = useState(savedState?.isSalesmanCustomer || false);
   const [isOthers, setIsOthers] = useState(savedState?.isOthers || false);
-  
+
   // Refs
   const discountInputRef = useRef();
   const qtyInputRefs = useRef({});
@@ -49,11 +49,11 @@ const Billing = () => {
   const customerContactInputRef = useRef();
 
   // Customer info
-  const [customerInfo, setCustomerInfo] = useState(savedState?.customerInfo || { 
-    name: '', 
-    contact: '', 
-    address: '', 
-    gstin: '' 
+  const [customerInfo, setCustomerInfo] = useState(savedState?.customerInfo || {
+    name: '',
+    contact: '',
+    address: '',
+    gstin: ''
   });
 
   // Hotkeys
@@ -87,7 +87,7 @@ const Billing = () => {
     try {
       const data = await window.electronAPI.getInventory();
       setItems(data);
-      
+
       // Update cart items with latest stock info if cart was loaded from session
       if (savedState?.cart && savedState.cart.length > 0) {
         const updatedCart = savedState.cart.map(cartItem => {
@@ -139,22 +139,22 @@ const Billing = () => {
 
   // Clear all form data
   const clearForm = () => {
-  setCart([]);
-  setDiscount(0);
-  setBillDate(new Date().toISOString().split('T')[0]);
-  setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
-  setBillNarration('');
-  setSelectedSalesman('');
-  setIsSalesmanCustomer(false);
-  setIsOthers(false);
-  sessionStorage.removeItem('billingState');
-  return true ;
-};
+    setCart([]);
+    setDiscount(0);
+    setBillDate(new Date().toISOString().split('T')[0]);
+    setCustomerInfo({ name: '', contact: '', address: '', gstin: '' });
+    setBillNarration('');
+    setSelectedSalesman('');
+    setIsSalesmanCustomer(false);
+    setIsOthers(false);
+    sessionStorage.removeItem('billingState');
+    return true;
+  };
 
   // --- Fast item search and add ---
   const filteredItems = items.filter(item =>
-    (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
+  (item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const handleSearchKeyDown = (e) => {
@@ -175,7 +175,7 @@ const Billing = () => {
   // --- Add to cart with proper rate selection ---
   const addToCart = (item) => {
     const rate = isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate;
-    
+
     const existingIndex = cart.findIndex(cartItem => cartItem.id === item.id);
     if (existingIndex !== -1) {
       setCart(cart.map((cartItem) =>
@@ -276,9 +276,9 @@ const Billing = () => {
     const baseAmount = item.unit_price * item.quantity;
     return { baseAmount, totalAmount: baseAmount };
   };
-  
+
   const getSubtotal = () => cart.reduce((sum, item) => sum + calculateItemTotal(item).baseAmount, 0);
-  
+
   const getRoundingOff = () => {
     const total = getSubtotal();
     const discountAmount = (total * discount) / 100;
@@ -300,7 +300,7 @@ const Billing = () => {
       toast.error('Cart is empty');
       return;
     }
-    
+
     // Stock validation
     for (const cartItem of filteredCart) {
       if (parseInt(cartItem.quantity) > cartItem.current_stock) {
@@ -308,7 +308,7 @@ const Billing = () => {
         return;
       }
     }
-    
+
     try {
       // Create customer if needed
       if (customerInfo.contact && /^\d{10}$/.test(customerInfo.contact.trim())) {
@@ -322,7 +322,7 @@ const Billing = () => {
 
       const saleItems = filteredCart.map(item => {
         const { totalAmount } = calculateItemTotal({ ...item, quantity: parseInt(item.quantity) });
-        return { 
+        return {
           id: item.id,
           quantity: parseInt(item.quantity),
           unit_price: item.unit_price,
@@ -330,7 +330,7 @@ const Billing = () => {
           total_price: totalAmount
         };
       });
-      
+
       const saleData = {
         bill_number: billNumber,
         customer_name: customerInfo.name || null,
@@ -346,7 +346,7 @@ const Billing = () => {
         sale_type: isOthers ? 'others' : (isSalesmanCustomer ? 'salesman' : 'customer'),
         narration: billNarration
       };
-      
+
       await window.electronAPI.saveSale(saleData);
 
       // --- PDF/PRINT GENERATION ---
@@ -362,7 +362,7 @@ const Billing = () => {
 
           const { createRoot } = await import('react-dom/client');
           const root = createRoot(pdfContainer);
-          
+
           root.render(
             <BillPDF
               billNumber={billNumber}
@@ -386,11 +386,11 @@ const Billing = () => {
             />
           );
 
-          setTimeout(async () => { 
-            const pdf = new jsPDF({ 
+          setTimeout(async () => {
+            const pdf = new jsPDF({
               orientation: 'portrait',
               unit: 'mm',
-              format: 'a4' 
+              format: 'a4'
             });
 
             const pageElements = pdfContainer.querySelectorAll('#bill-pdf > div');
@@ -416,7 +416,7 @@ const Billing = () => {
             if (action === 'print') {
               const pdfOutput = pdf.output('arraybuffer');
               const result = await window.electronAPI.printPdf(pdfOutput);
-              
+
               if (result.success) {
                 toast.success('Invoice sent to printer!');
               } else {
@@ -441,16 +441,16 @@ const Billing = () => {
       await fetchCustomers();
 
       // Reset form and clear session storage - SINGLE CALL TO clearForm()
-        clearForm();
-      
-   
-   
-      
+      clearForm();
+
+
+
+
       toast.success('Sale completed successfully!');
-     
-       
+
+
       // Reload data
-      
+
     } catch (error) {
       console.error('Error completing sale:', error);
       toast.error('Error completing sale');
@@ -512,6 +512,22 @@ const Billing = () => {
           <p className="text-gray-600">Create invoices and manage billing transactions</p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-3">
+           {/* Bill Date Selection */}
+          
+         
+              <div className="flex-1 ">
+                
+                {/* <label className="block text-sm font-medium text-gray-700 mb-2">Bill Date</label> */}
+                <input
+                  type="date"
+                  value={billDate}
+                  onChange={(e) => setBillDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+          
+          
           <div className="bg-blue-50 px-4 py-2 rounded-lg">
             <span className="text-sm font-medium text-blue-800">Bill No: {billNumber}</span>
           </div>
@@ -529,22 +545,7 @@ const Billing = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Items List */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Bill Date Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-4">
-              <Calendar className="w-5 h-5 text-gray-500" />
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Bill Date</label>
-                <input
-                  type="date"
-                  value={billDate}
-                  onChange={(e) => setBillDate(e.target.value)}
-                  max={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-          </div>
+         
 
           {/* Search */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -581,7 +582,7 @@ const Billing = () => {
                       }}
                       tabIndex={-1}
                     >
-                      {item.name} 
+                      {item.name}
                       <span className="text-xs text-gray-400 ml-2">
                         (Stock: {item.current_stock}, Rate: ₹{isOthers || isSalesmanCustomer ? item.salesman_rate : item.customer_rate})
                       </span>
@@ -634,7 +635,7 @@ const Billing = () => {
                   </ul>
                 )}
               </div>
-              
+
               {/* Contact with dropdown */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
@@ -672,7 +673,7 @@ const Billing = () => {
                   </ul>
                 )}
               </div>
-              
+
               {/* Address */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
@@ -685,7 +686,7 @@ const Billing = () => {
                   tabIndex={3}
                 />
               </div>
-              
+
               {/* GSTIN */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">GSTIN (Optional)</label>
@@ -699,7 +700,7 @@ const Billing = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center mt-6 space-x-6">
               <div className="flex items-center">
                 <input
@@ -727,6 +728,7 @@ const Billing = () => {
                 </label>
               </div>
             </div>
+            
           </div>
 
           {/* Salesman Selection */}
@@ -921,7 +923,7 @@ const Billing = () => {
                     Complete & Generate PDF
                   </button>
                   <button
-                    onClick={()=> toast.info('Coming Soon')}
+                    onClick={() => toast.info('Coming Soon')}
                     className="w-full flex items-center justify-center px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
                     tabIndex={0}
                   >

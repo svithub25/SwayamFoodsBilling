@@ -33,6 +33,7 @@ import SaleEdit from "./components/SaleEdit";
 import Contactus from "./components/Contactus"; 
 import OpeningStockManagement from "./components/Openingstock/OpeningStockManagement"
 import SalesmanCommission from "./components/SalesmanCommission";
+import Company from "./components/Company";
 
 
 const App = () => {
@@ -52,10 +53,11 @@ const App = () => {
   useHotkeys("ctrl+h", () => navigate("/sales-history"), [navigate]);
   useHotkeys("ctrl+s", () => navigate("/salesman-commission"), [navigate]);
   useHotkeys("ctrl+l", () => navigate("/ledger"), [navigate]);
+  useHotkeys("ctrl+u", () => navigate("/company"), [navigate]);
   useHotkeys("ctrl+y", () => navigate("/analytics"), [navigate]);
   useHotkeys("ctrl+e", () => navigate("/export"), [navigate]);
   useHotkeys("ctrl+n", () => navigate("/admin"), [navigate]);
-  useHotkeys("ctrl+k", () => navigate("/banking"), [navigate]);
+  useHotkeys("ctrl+k", () => navigate("/banking"), [navigate]); 
   
   // useHotkeys("ctrl+t", () => {setShowShortcutHelp(true);
   //  console.log("Shortcut Help Opened");  
@@ -100,6 +102,7 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/company" element={<Company />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/purchase" element={<Purchase />} />
                 <Route path="/billing" element={<Billing />} />

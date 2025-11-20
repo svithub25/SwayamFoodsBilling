@@ -37,6 +37,7 @@ const Dashboard = () => {
   const shortcuts = [
     { key: 'ESC', description: 'Toggle Sidebar (Open/Close)' },
     { key: 'Ctrl + D', description: 'Go to Dashboard' },
+    { key: 'Ctrl + U', description: 'Go to Company' },
     { key: 'Ctrl + I', description: 'Go to Inventory' },
     { key: 'Ctrl + P', description: 'Go to Purchase' },
     { key: 'Ctrl + O', description: 'Go to Purchase Order' },

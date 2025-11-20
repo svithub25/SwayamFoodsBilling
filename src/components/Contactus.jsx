@@ -11,7 +11,8 @@ import {
   Linkedin,
   Twitter,
   Facebook,
-  ExternalLink
+  ExternalLink,
+  Instagram
 } from 'lucide-react';
 import svilogo from'../Assets/SV ITHub Logo.jpg'; 
 
@@ -219,25 +220,25 @@ const Contactus = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Follow Us</h3>
               <div className="flex space-x-3">
                 <button
-                  //onClick={() => openExternalLink('https://linkedin.com/company/svithub')}
+                  onClick={() => openExternalLink('https://linkedin.com/company/s-v-it-hub')}
                   className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center hover:bg-blue-200 transition-colors"
                   title="LinkedIn"
                 >
                   <Linkedin className="w-5 h-5 text-blue-600" />
                 </button>
-                <button
-                 // onClick={() => openExternalLink('https://twitter.com/svithub')}
+                {/* <button
+                  onClick={() => openExternalLink('https://twitter.com/svithub')}
                   className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center hover:bg-sky-200 transition-colors"
                   title="Twitter"
                 >
                   <Twitter className="w-5 h-5 text-sky-600" />
-                </button>
+                </button> */}
                 <button
-                  //onClick={() => openExternalLink('https://facebook.com/svithub')}
-                  className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center hover:bg-blue-200 transition-colors"
-                  title="Facebook"
+                  onClick={() => openExternalLink('https://www.instagram.com/sv.ithub?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==')}
+                  className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center hover:bg-orange-200 transition-colors"
+                  title="Instagram"
                 >
-                  <Facebook className="w-5 h-5 text-blue-800" />
+                  <Instagram className="w-5 h-5 text-orange-500" />
                 </button>
               </div>
             </div>

@@ -18,7 +18,6 @@ export function registerAppInfoHandler({ ipcMain, app, packageJsonPath }) {
       description: pkg.description || '',
       author: pkg.author || '',
       company: pkg.company || '',
-      license: 'Swayam Foods',
       homepage: pkg.homepageUrl || pkg.homepage || '',
       repository: pkg.repository?.url || '',
       bugs: pkg.bugs?.url || '',
