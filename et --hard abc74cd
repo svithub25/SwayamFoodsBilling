@@ -1,0 +1,49 @@
+[33me043b82[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to HEAD~1
+[33mabc74cd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{1}: reset: moving to HEAD~1
+[33m6b45aa8[m HEAD@{2}: merge upstream/main: Merge made by the 'ort' strategy.
+[33mabc74cd[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{3}: commit (merge): feat: Enhance Contact Us and Dashboard components; add company info loading to Purchase Order and Purchase PDF
+[33me043b82[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{4}: commit: Refactor code structure and remove redundant sections for improved readability and maintainability
+[33m3d849cf[m HEAD@{5}: commit: feat: add BankSettings component for managing transaction categories
+[33m85c3c3d[m HEAD@{6}: commit: feat: Implement Ledger Data component with transaction management, filters, and pagination
+[33m732852d[m HEAD@{7}: commit: feat: Enhance transaction handling and reporting
+[33m1f6f65a[m HEAD@{8}: commit: refactor: Restructure main.js and preload.js for improved organization and maintainability; implement channel grouping for IPC communication
+[33m098741f[m HEAD@{9}: commit: feat: Add Banking component with PIN protection and update routing in App component
+[33m5510332[m HEAD@{10}: commit: feat: Enhance analytics data retrieval with category analysis and new filters in SalesHistory component
+[33m1966271[m HEAD@{11}: commit: Refactor code structure for improved readability and maintainability
+[33mc10228b[m HEAD@{12}: commit: Refactor PurchaseOrder and SalesHistory components; implement item filtering and pagination in SalesmanCommission component
+[33meb514b7[m HEAD@{13}: commit: Implement code changes to enhance functionality and improve performance
+[33m9cca6fb[m HEAD@{14}: commit: refactor: Update stock validation logic and improve console logging in Billing and SaleEdit components
+[33m111f01c[m HEAD@{15}: commit: feat: Implement SKU auto-generation and enhance Billing component with search functionality
+[33m192a1fb[m HEAD@{16}: commit (merge): Refactor Billing component:
+[33m8270868[m HEAD@{17}: checkout: moving from main to main
+[33m8270868[m HEAD@{18}: commit: feat: Enhance sale handling by preserving customer and salesman rates, improve stock validation, and update PDF generation for better clarity
+[33m2a3e711[m HEAD@{19}: commit: feat: Enhance PDF printing functionality and update Billing component with salesman details
+[33mb4bfa8d[m HEAD@{20}: commit: feat: Implement PDF printing functionality in Billing component and update related files
+[33m43fb074[m HEAD@{21}: commit: feat: Add bill message management and enhance Billing and SalesmanCommission components with additional fields
+[33m194d179[m HEAD@{22}: commit: feat: Enhance analytics queries to include status code filtering and update UI components for better clarity
+[33meab2020[m HEAD@{23}: commit: feat: Implement salesman/customer logic with checkbox functionality in SaleEdit and Billing components
+[33m21b881c[m HEAD@{24}: commit (merge): Merge remote-tracking branch 'upstream/main'
+[33m2530c63[m HEAD@{25}: commit: feat: Update invoice layout and contact information in BillPDF, PurchaseOrderPdf, and PurchasePDF components
+[33m3f81a86[m HEAD@{26}: commit (merge): Refactor PDF generation in PurchaseOrder and SalesHistory components
+[33m108506b[m HEAD@{27}: checkout: moving from main to main
+[33m108506b[m HEAD@{28}: commit: feat: Enhance Billing component with 'Others' checkbox for rate selection and auto-select functionality
+[33mf27f89e[m HEAD@{29}: commit (merge): feat: Add new favicon files and update contact information in Contactus component
+[33m5017ed0[m HEAD@{30}: commit: feat: Update inventory calculations to use customer rate and modify PDF layouts for improved presentation
+[33mb3b393c[m HEAD@{31}: commit: feat: Update bill number prefix and license information in the application
+[33m89bde0f[m HEAD@{32}: commit (merge): feat: Enhance Billing Component with Customer Management
+[33m48a977e[m HEAD@{33}: commit: feat: Add Salesman Commission feature with filtering and commission calculation
+[33mf6674f9[m HEAD@{34}: merge upstream/main: Merge made by the 'ort' strategy.
+[33m5359e3f[m HEAD@{35}: commit (merge): fix: Set default value of current_stock to 0 and update input field to readOnly
+[33mec896e1[m HEAD@{36}: checkout: moving from main to main
+[33mec896e1[m HEAD@{37}: commit: refactor: Remove Python machine ID retrieval and add console logs for item loading and purchase history
+[33m26d8236[m HEAD@{38}: commit (merge): feat: Enhance Inventory and Purchase components with SKU search and product management
+[33m2a0a65c[m HEAD@{39}: checkout: moving from main to main
+[33m2a0a65c[m HEAD@{40}: commit: Remove get_machine_id.py script and its associated functionality
+[33mb1e33da[m HEAD@{41}: merge upstream/main: Merge made by the 'ort' strategy.
+[33mdd72196[m HEAD@{42}: commit: Add customer and salesman rate fields to item forms and billing logic
+[33mc72cb58[m HEAD@{43}: merge upstream/main: Merge made by the 'ort' strategy.
+[33mf986c52[m HEAD@{44}: commit: testt
+[33m34a2164[m HEAD@{45}: merge upstream/main: Merge made by the 'ort' strategy.
+[33m5b330fb[m HEAD@{46}: commit: testing changes for the client
+[33m2a5ffed[m HEAD@{47}: checkout: moving from main to main
+[33m2a5ffed[m HEAD@{48}: clone: from https://github.com/InfernoTJ/BillingSoftware.git
