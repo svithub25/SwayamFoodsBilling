@@ -653,22 +653,11 @@ db.exec(`
 
   -- Insert default company info
   INSERT OR IGNORE INTO company_info (
-    id, company_name, tagline, address_line1, address_line2, 
-    city, state, pincode, phone, mobile, email, website, 
+    id, company_name,
     footer_text
   ) VALUES (
     1, 
     'Company Name', 
-    'Tagline Here',
-    'Address Line 1',
-    'Address Line 2',
-    'City',
-    'State',
-    'Pincode',
-    'Phone',
-    'Mobile',
-    'Email',
-    'Website',
     'Thank you for your business! Visit us again.'
   );
 
