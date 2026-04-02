@@ -67,37 +67,7 @@ const ProfitAndLoss = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        
-        {/* <button
-          onClick={exportToPDF}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Export PDF
-        </button> */}
-      </div>
+  
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -157,9 +127,9 @@ const ProfitAndLoss = () => {
           <h3 className="text-lg font-semibold text-gray-900">
             Profit & Loss Statement
           </h3>
-          <p className="text-sm text-gray-600">
+          {/* <p className="text-sm text-gray-600">
             {new Date(filters.startDate).toLocaleDateString('en-IN')} to {new Date(filters.endDate).toLocaleDateString('en-IN')}
-          </p>
+          </p> */}
         </div>
 
         <div className="p-6">

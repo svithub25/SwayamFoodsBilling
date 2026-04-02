@@ -1,36 +1,40 @@
 export function registerSalesHandlers({ ipcMain, getDb }) {
-  ipcMain.handle('generate-bill-number', async () => {
-        const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth(); // 0-indexed (January=0, April=3)
+ipcMain.handle('generate-bill-number', async () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
 
-    let fyStartYear, fyEndYear;
-    if (month >= 3) { // April onwards (month 3 = April in 0-indexed)
-      fyStartYear = year;
-      fyEndYear = year + 1;
-    } else { // January-March
-      fyStartYear = year - 1;
-      fyEndYear = year;
-    }
+  let fyStartYear, fyEndYear;
+  if (month >= 3) {
+    fyStartYear = year;
+    fyEndYear = year + 1;
+  } else {
+    fyStartYear = year - 1;
+    fyEndYear = year;
+  }
 
-    const yearSuffix = `${fyStartYear.toString().slice(-2)}-${fyEndYear.toString().slice(-2)}`;
+  const yearSuffix = `${fyStartYear.toString().slice(-2)}-${fyEndYear.toString().slice(-2)}`;
 
-    const lastBill = getDb().prepare(`
-      SELECT bill_number FROM sales
-      WHERE bill_number LIKE ?
-      ORDER BY id DESC LIMIT 1
-    `).get(`SF/${yearSuffix}/%`);
+  const START_FROM = 3647; 
+  const lastBill = getDb().prepare(`
+    SELECT bill_number FROM sales
+    WHERE bill_number LIKE ?
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(`SF/${yearSuffix}/%`);
 
-    let nextNumber = 1;
-    if (lastBill?.bill_number) {
-      const match = lastBill.bill_number.match(/SF\/\d{2}-\d{2}\/(\d+)/);
-      if (match?.[1]) {
-        nextNumber = parseInt(match[1], 10) + 1;
-      }
-    }
+  let nextNumber = START_FROM;
 
-    return `SF/${yearSuffix}/${nextNumber.toString().padStart(0, '0')}`;
-  });
+  if (lastBill?.bill_number) {
+    const match = lastBill.bill_number.match(/SF\/\d{2}-\d{2}\/(\d+)/);
+    const lastNumber = match?.[1] ? parseInt(match[1], 10) : 0;
+
+   
+    nextNumber = lastNumber >= START_FROM ? lastNumber + 1 : START_FROM;
+  }
+
+  return `SF/${yearSuffix}/${nextNumber}`;
+});
 
   ipcMain.handle('save-sale', async (event, saleData) => {
     const {
